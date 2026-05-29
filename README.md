@@ -1,10 +1,11 @@
 # Slap Skills
 
 [![Go Version](https://img.shields.io/github/go-mod/go-version/vekzz-dev/slap-skills)](https://github.com/vekzz-dev/slap-skills)
-[![Release](https://img.shields.io/github/v/release/vekzz-dev/slap-skills)](https://github.com/vekzz-dev/slap-skills/releases)
-[![Build](https://img.shields.io/github/actions/workflow/status/vekzz-dev/slap-skills/release.yml?branch=main)](https://github.com/vekzz-dev/slap-skills/actions)
+[![Go Report](https://goreportcard.com/badge/github.com/vekzz-dev/slap-skills)](https://goreportcard.com/report/github.com/vekzz-dev/slap-skills)
+[![Tag](https://img.shields.io/github/v/tag/vekzz-dev/slap-skills)](https://github.com/vekzz-dev/slap-skills/tags)
+[![CI](https://img.shields.io/github/actions/workflow/status/vekzz-dev/slap-skills/ci.yml?branch=main)](https://github.com/vekzz-dev/slap-skills/actions)
 [![Homebrew](https://img.shields.io/badge/Homebrew-vekzz--dev%2Ftap%2Fslap--skills-orange)](https://github.com/vekzz-dev/homebrew-tap)
-[![License](https://img.shields.io/github/license/vekzz-dev/slap-skills)](https://github.com/vekzz-dev/slap-skills/blob/main/LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-blue)](https://github.com/vekzz-dev/slap-skills/blob/main/LICENSE)
 
 **Slap Skills** syncs opencode skills from any git repo to `~/.config/opencode/skills/` — without touching existing skills from other sources.
 
