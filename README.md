@@ -146,6 +146,12 @@ go test ./...
 
 ---
 
+## Roadmap
+
+Slap Skills currently targets **opencode**, but the vision is bigger. Future plans include supporting other AI coding agents — Claude Code, Cursor, Copilot, and any agent that loads local skill/instruction files — so you can manage **all your agent skills from one place**.
+
+---
+
 ## License
 
 MIT

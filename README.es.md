@@ -146,6 +146,12 @@ go test ./...
 
 ---
 
+## Roadmap
+
+Hoy Slap Skills apunta a **opencode**, pero la visión es más grande. Próximos planes incluyen soporte para otros agentes de IA — Claude Code, Cursor, Copilot, y cualquier agente que cargue archivos de skills/instrucciones locales — así manejás **todas las skills de tus agentes desde un solo lugar**.
+
+---
+
 ## Licencia
 
 MIT
