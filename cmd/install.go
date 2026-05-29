@@ -1,14 +1,12 @@
 package cmd
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
-	"strings"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/spf13/cobra"
 	"github.com/vekzz-dev/slap-skills/internal/config"
 	"github.com/vekzz-dev/slap-skills/internal/manifest"
@@ -65,10 +63,10 @@ Use --all to install every skill from the repo without prompting.`,
 			}
 
 			// Filter: only skills not already installed
-			var available []repo.SkillDir
+			var available []string
 			for _, s := range repoSkills {
 				if !m.HasSkill(s.Name) {
-					available = append(available, s)
+					available = append(available, s.Name)
 				}
 			}
 
@@ -78,50 +76,37 @@ Use --all to install every skill from the repo without prompting.`,
 			}
 
 			// Sort alphabetically
-			sort.Slice(available, func(i, j int) bool {
-				return available[i].Name < available[j].Name
-			})
+			sort.Strings(available)
 
-			toInstall := available
+			selected := available
 
 			if !installAll {
-				// Interactive selection
-				fmt.Println("\nAvailable skills:")
-				for i, s := range available {
-					fmt.Printf("  %2d. %s\n", i+1, s.Name)
+				// Interactive multi-select with arrow keys, space, enter
+				prompt := &survey.MultiSelect{
+					Message: "Select skills to install:",
+					Options: available,
+					Description: func(value string, index int) string {
+						return ""
+					},
 				}
-				fmt.Print("\nEnter numbers separated by commas (or 'all'): ")
-				reader := bufio.NewReader(os.Stdin)
-				input, _ := reader.ReadString('\n')
-				input = strings.TrimSpace(input)
-
-				if strings.ToLower(input) == "all" {
-					toInstall = available
-				} else {
-					selected := make(map[int]bool)
-					for _, part := range strings.Split(input, ",") {
-						part = strings.TrimSpace(part)
-						n, err := strconv.Atoi(part)
-						if err != nil || n < 1 || n > len(available) {
-							fmt.Printf("Invalid selection: %s\n", part)
-							continue
-						}
-						selected[n-1] = true
-					}
-					toInstall = nil
-					for i, s := range available {
-						if selected[i] {
-							toInstall = append(toInstall, s)
-						}
-					}
-					if len(toInstall) == 0 {
-						return fmt.Errorf("no valid skills selected")
-					}
+				if err := survey.AskOne(prompt, &selected, survey.WithPageSize(20)); err != nil {
+					return err
+				}
+				if len(selected) == 0 {
+					fmt.Println("No skills selected.")
+					return nil
 				}
 			}
 
+			// Build a lookup by name
+			skillMap := make(map[string]repo.SkillDir, len(repoSkills))
+			for _, s := range repoSkills {
+				skillMap[s.Name] = s
+			}
+
 			// Install each selected skill
-			for _, s := range toInstall {
+			for _, name := range selected {
+				s := skillMap[name]
 				src := filepath.Join(tmpDir, s.Name)
 				dst := filepath.Join(targetDir, s.Name)
 				if err := copyDir(src, dst); err != nil {
@@ -137,9 +122,9 @@ Use --all to install every skill from the repo without prompting.`,
 			}
 
 			if installAll {
-				fmt.Printf("\nInstalled %d skill(s).\n", len(toInstall))
+				fmt.Printf("\nInstalled %d skill(s).\n", len(selected))
 			} else {
-				fmt.Printf("\nInstalled %d of %d available skill(s).\n", len(toInstall), len(available))
+				fmt.Printf("\nInstalled %d of %d available skill(s).\n", len(selected), len(available))
 			}
 			return nil
 		},
