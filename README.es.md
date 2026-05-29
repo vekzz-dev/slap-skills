@@ -9,7 +9,7 @@
 
 [🇬🇧 English](README.md)
 
-**Slap Skills** sincroniza tus skills de opencode desde cualquier repo git a `~/.config/opencode/skills/` — sin tocar las skills existentes de otras fuentes.
+**Slap Skills** es para los que no confían en skills de terceros bajadas con `npx` o herramientas similares. Dueño de tu workflow. Tus skills en tu propio repo git — público o privado — y sincronizadas a tu máquina con un solo comando. Sin npx, sin registros, sin dependencias de terceros. Solo git y un `slap sync`.
 
 ```bash
 brew tap vekzz-dev/tap
