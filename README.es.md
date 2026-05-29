@@ -77,6 +77,8 @@ Descargá el binario de [GitHub Releases](https://github.com/vekzz-dev/slap-skil
 | `slap status` | Mostrá diferencias entre skills locales y el repo |
 | `slap remove <skill>` | Eliminá una skill instalada |
 | `slap remove --all` | Eliminá todas las skills y limpiá el manifest |
+| `slap version` | Mostrá la versión actual |
+| `slap --version` | Mostrá la versión actual (flag corto) |
 
 ### Flags globales
 

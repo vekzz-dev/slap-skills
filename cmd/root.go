@@ -10,12 +10,25 @@ import (
 	"github.com/vekzz-dev/slap-skills/internal/repo"
 )
 
+// Version is set at build time via ldflags (e.g., goreleaser).
+var Version = "dev"
+
 // Root-level persistent flag values.
 var (
 	flagRepo      string
 	flagBranch    string
 	flagTargetDir string
 )
+
+func newVersionCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "version",
+		Short: "Print the version number",
+		Run: func(cmd *cobra.Command, args []string) {
+			cmd.Println(Version)
+		},
+	}
+}
 
 // expandPath replaces a leading ~/ with the user's home directory.
 func expandPath(path string) string {
@@ -75,8 +88,9 @@ func computeLocalSHA(dir string) string {
 // NewRootCmd creates the slap root command with all subcommands.
 func NewRootCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "slap",
-		Short: "Slap Skills — manage opencode skills from a git repo",
+		Use:     "slap",
+		Version: Version,
+		Short:   "Slap Skills — manage opencode skills from a git repo",
 		Long: `Slap Skills syncs opencode skills from any git repo to your local skills directory.
 
   init    - Configure a git repo as the skill source
@@ -84,7 +98,8 @@ func NewRootCmd() *cobra.Command {
   remove  - Remove installed skills
   sync    - Update installed skills from the repo
   list    - List installed skills
-  status  - Show drift between local skills and the repo`,
+  status  - Show drift between local skills and the repo
+  version - Print the current version`,
 	}
 
 	cmd.PersistentFlags().StringVar(&flagRepo, "repo", "", "Override the configured repo URL")
@@ -94,6 +109,7 @@ func NewRootCmd() *cobra.Command {
 	cmd.AddCommand(newInitCmd())
 	cmd.AddCommand(newInstallCmd())
 	cmd.AddCommand(newRemoveCmd())
+	cmd.AddCommand(newVersionCmd())
 	cmd.AddCommand(newSyncCmd())
 	cmd.AddCommand(newListCmd())
 	cmd.AddCommand(newStatusCmd())

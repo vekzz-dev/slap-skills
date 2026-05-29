@@ -12,7 +12,7 @@ builds:
     main: .
     binary: slap
     ldflags:
-      - -s -w -X main.version={{ .Version }} -X main.commit={{ .Commit }} -X main.date={{ .Date }}
+      - -s -w -X github.com/vekzz-dev/slap-skills/cmd.Version={{ .Version }}
     goos:
       - linux
       - darwin

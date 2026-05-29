@@ -77,6 +77,8 @@ Download the latest binary from [GitHub Releases](https://github.com/vekzz-dev/s
 | `slap status` | Show drift between local skills and the repo |
 | `slap remove <skill>` | Remove a specific installed skill |
 | `slap remove --all` | Remove all installed skills and clean the manifest |
+| `slap version` | Print the current version |
+| `slap --version` | Print the current version (short flag) |
 
 ### Global flags
 
