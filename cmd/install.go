@@ -18,7 +18,7 @@ func newInstallCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "install",
-		Short: "Install skills from the configured repo",
+		Short: "Select and install skills from the repo",
 		Long: `List available skills from the configured repo and install the ones you choose.
 
 Use --all to install every skill from the repo without prompting.`,
@@ -78,7 +78,7 @@ Use --all to install every skill from the repo without prompting.`,
 			// Sort alphabetically
 			sort.Strings(available)
 
-			selected := available
+			var selected []string
 
 			if !installAll {
 				// Interactive multi-select with arrow keys, space, enter
@@ -96,6 +96,8 @@ Use --all to install every skill from the repo without prompting.`,
 					fmt.Println("No skills selected.")
 					return nil
 				}
+			} else {
+				selected = available
 			}
 
 			// Build a lookup by name
