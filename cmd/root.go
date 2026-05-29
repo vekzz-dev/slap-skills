@@ -90,8 +90,8 @@ func NewRootCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "slap",
 		Version: Version,
-		Short:   "Slap Skills — manage opencode skills from a git repo",
-		Long: `Slap Skills syncs opencode skills from any git repo to your local skills directory.
+		Short:   "Slap Skills — manage AI agent skills from a git repo",
+		Long: `Slap Skills syncs AI agent skills from any git repo to your local skills directory.
 
   init    - Configure a git repo as the skill source
   install - Select and install skills from the repo

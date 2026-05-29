@@ -9,7 +9,7 @@
 
 [🇪🇸 Español](README.es.md)
 
-**Slap Skills** is for those who don't trust random skills from the internet. Own your workflow. Keep your skills in your own git repo — public or private — and sync them to your machine with one command. No npx, no registries, no third-party dependencies. Just git and a `slap sync`.
+**Slap Skills** is for those who don't trust random skills from the internet. Own your workflow. Keep your AI agent skills in your own git repo — public or private — and sync them to your machine with one command. No npx, no registries, no third-party dependencies. Just git and a `slap sync`.
 
 ```bash
 brew tap vekzz-dev/tap

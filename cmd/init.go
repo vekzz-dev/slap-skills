@@ -12,7 +12,7 @@ func newInitCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "init <repo-url>",
 		Short: "Configure a git repo as the skill source",
-		Long: `Configure a git repo as the source for opencode skills.
+		Long: `Configure a git repo as the source for AI agent skills.
 
 Validates that the repo is reachable (ls-remote), then writes the
 configuration to ~/.config/slap/config.yaml so that 'slap sync'
