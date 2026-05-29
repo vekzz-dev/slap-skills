@@ -7,6 +7,8 @@
 [![Homebrew](https://img.shields.io/badge/Homebrew-vekzz--dev%2Ftap%2Fslap--skills-orange)](https://github.com/vekzz-dev/homebrew-tap)
 [![Licencia](https://img.shields.io/badge/license-MIT-blue)](https://github.com/vekzz-dev/slap-skills/blob/main/LICENSE)
 
+[🇬🇧 English](README.md)
+
 **Slap Skills** sincroniza tus skills de opencode desde cualquier repo git a `~/.config/opencode/skills/` — sin tocar las skills existentes de otras fuentes.
 
 ```bash
