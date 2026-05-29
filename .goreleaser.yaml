@@ -44,7 +44,7 @@ brews:
     repository:
       owner: vekzz-dev
       name: homebrew-tap
-    token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+
     description: "CLI to manage your opencode skills from any git repo"
     homepage: "https://github.com/vekzz-dev/slap-skills"
     license: "MIT"
