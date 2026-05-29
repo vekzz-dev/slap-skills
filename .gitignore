@@ -19,3 +19,6 @@ coverage.out
 # OS
 .DS_Store
 Thumbs.db
+
+# SDD internal state (auto-generated, local paths)
+.atl/
