@@ -27,13 +27,16 @@ slap sync
 # 1. Configure your skill repo
 slap init https://github.com/user/your-skills
 
-# 2. Install all skills
+# 2. Install skills (choose which ones, or --all)
+slap install --all
+
+# 3. Keep them updated
 slap sync
 
-# 3. See what's installed
+# 4. See what's installed
 slap list
 
-# 4. Check for updates
+# 5. Check for updates
 slap status
 ```
 
@@ -65,11 +68,15 @@ Download the latest binary from [GitHub Releases](https://github.com/vekzz-dev/s
 | Command | Description |
 |---------|-------------|
 | `slap init <repo-url>` | Configure a git repo as the skill source |
-| `slap sync` | Install or update skills from the configured repo |
+| `slap install` | Select which skills to install from the repo |
+| `slap install --all` | Install all skills from the repo without prompting |
+| `slap sync` | Update installed skills from the repo |
 | `slap sync --prune` | Sync and remove local skills no longer in the repo |
 | `slap list` | List installed skills |
 | `slap list --json` | List installed skills as JSON |
 | `slap status` | Show drift between local skills and the repo |
+| `slap remove <skill>` | Remove a specific installed skill |
+| `slap remove --all` | Remove all installed skills and clean the manifest |
 
 ### Global flags
 

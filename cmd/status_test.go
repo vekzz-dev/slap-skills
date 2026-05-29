@@ -28,7 +28,8 @@ func TestStatusCmd_NoConfig(t *testing.T) {
 func TestStatusCmd_UpToDate(t *testing.T) {
 	homeDir := setupSyncTest(t, []string{"skill-a"})
 
-	// Run sync first to install the skill and create manifest.
+	// Install first, then sync updates the manifest SHA.
+	installAllSkills(t)
 	root := NewRootCmd()
 	root.SetArgs([]string{"sync"})
 	if err := root.Execute(); err != nil {
@@ -42,9 +43,7 @@ func TestStatusCmd_UpToDate(t *testing.T) {
 		t.Fatalf("status failed: %v", err)
 	}
 
-	// We can't easily capture output here (it goes to stdout),
-	// but the command didn't error — that's the basic check.
-	// We verify by checking that manifest and local state match.
+	// Verify manifest has the skill.
 	manifestPath := filepath.Join(homeDir, ".config", "slap", "manifest.json")
 	m, err := manifest.Load(manifestPath)
 	if err != nil {
@@ -59,12 +58,7 @@ func TestStatusCmd_MissingLocally(t *testing.T) {
 	homeDir := setupSyncTest(t, []string{"skill-a"})
 	targetDir := filepath.Join(homeDir, ".config", "opencode", "skills")
 
-	// Run sync to install and create manifest.
-	root := NewRootCmd()
-	root.SetArgs([]string{"sync"})
-	if err := root.Execute(); err != nil {
-		t.Fatalf("sync failed: %v", err)
-	}
+	installAllSkills(t)
 
 	// Delete the skill directory locally.
 	if err := os.RemoveAll(filepath.Join(targetDir, "skill-a")); err != nil {
@@ -72,7 +66,7 @@ func TestStatusCmd_MissingLocally(t *testing.T) {
 	}
 
 	// Status should still succeed (it reports "missing" but doesn't error).
-	root = NewRootCmd()
+	root := NewRootCmd()
 	root.SetArgs([]string{"status"})
 	if err := root.Execute(); err != nil {
 		t.Fatalf("status with missing skill should not error: %v", err)
@@ -83,12 +77,8 @@ func TestStatusCmd_NewSkillInRepo(t *testing.T) {
 	homeDir := setupSyncTest(t, []string{"skill-a"})
 	targetDir := filepath.Join(homeDir, ".config", "opencode", "skills")
 
-	// Run initial sync.
-	root := NewRootCmd()
-	root.SetArgs([]string{"sync"})
-	if err := root.Execute(); err != nil {
-		t.Fatalf("sync failed: %v", err)
-	}
+	// Install skill-a
+	installAllSkills(t)
 
 	// Create a second repo that has an additional skill.
 	newRepoDir := t.TempDir()
@@ -104,8 +94,8 @@ func TestStatusCmd_NewSkillInRepo(t *testing.T) {
 		t.Fatalf("saving updated config: %v", err)
 	}
 
-	// Status should detect skill-b as "new".
-	root = NewRootCmd()
+	// Status should detect skill-b as "new" (available but not installed).
+	root := NewRootCmd()
 	root.SetArgs([]string{"status"})
 	if err := root.Execute(); err != nil {
 		t.Fatalf("status should not error with new repo skills: %v", err)
@@ -121,11 +111,7 @@ func TestStatusCmd_LocallyModified(t *testing.T) {
 	homeDir := setupSyncTest(t, []string{"skill-a"})
 	targetDir := filepath.Join(homeDir, ".config", "opencode", "skills")
 
-	root := NewRootCmd()
-	root.SetArgs([]string{"sync"})
-	if err := root.Execute(); err != nil {
-		t.Fatalf("sync failed: %v", err)
-	}
+	installAllSkills(t)
 
 	// Modify a local skill file (this changes the local tree SHA).
 	skillFile := filepath.Join(targetDir, "skill-a", "skill.yaml")
@@ -134,7 +120,7 @@ func TestStatusCmd_LocallyModified(t *testing.T) {
 	}
 
 	// Status should still succeed (detects local modification).
-	root = NewRootCmd()
+	root := NewRootCmd()
 	root.SetArgs([]string{"status"})
 	if err := root.Execute(); err != nil {
 		t.Fatalf("status after local modification should not error: %v", err)

@@ -27,13 +27,16 @@ slap sync
 # 1. Configurá tu repo de skills
 slap init https://github.com/usuario/tus-skills
 
-# 2. Instalá todas las skills
+# 2. Instalá las skills (elegís cuáles, o --all)
+slap install --all
+
+# 3. Mantenelas actualizadas
 slap sync
 
-# 3. Mirá qué tenés instalado
+# 4. Mirá qué tenés instalado
 slap list
 
-# 4. Revisá si hay actualizaciones
+# 5. Revisá si hay actualizaciones
 slap status
 ```
 
@@ -65,11 +68,15 @@ Descargá el binario de [GitHub Releases](https://github.com/vekzz-dev/slap-skil
 | Comando | Descripción |
 |---------|-------------|
 | `slap init <repo-url>` | Configurá un repo git como fuente de skills |
-| `slap sync` | Instalá o actualizá skills desde el repo configurado |
+| `slap install` | Seleccioná qué skills instalar del repo |
+| `slap install --all` | Instalá todas las skills del repo sin preguntar |
+| `slap sync` | Actualizá las skills instaladas desde el repo |
 | `slap sync --prune` | Sincronizá y eliminá skills locales que ya no están en el repo |
 | `slap list` | Listá skills instaladas |
 | `slap list --json` | Listá skills instaladas en JSON |
 | `slap status` | Mostrá diferencias entre skills locales y el repo |
+| `slap remove <skill>` | Eliminá una skill instalada |
+| `slap remove --all` | Eliminá todas las skills y limpiá el manifest |
 
 ### Flags globales
 

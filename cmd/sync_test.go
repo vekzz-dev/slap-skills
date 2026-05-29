@@ -34,10 +34,24 @@ func setupSyncTest(t *testing.T, skills []string) (homeDir string) {
 	return homeDir
 }
 
+// installAllSkills runs slap install --all to install all available skills.
+func installAllSkills(t *testing.T) {
+	t.Helper()
+	root := NewRootCmd()
+	root.SetArgs([]string{"install", "--all"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("install --all failed: %v", err)
+	}
+}
+
 func TestSyncCmd_BasicFlow(t *testing.T) {
 	homeDir := setupSyncTest(t, []string{"skill-a", "skill-b"})
 	targetDir := filepath.Join(homeDir, ".config", "opencode", "skills")
 
+	// Install skills first
+	installAllSkills(t)
+
+	// Sync updates existing skills
 	root := NewRootCmd()
 	root.SetArgs([]string{"sync"})
 	if err := root.Execute(); err != nil {
@@ -87,6 +101,9 @@ func TestSyncCmd_NoConfig(t *testing.T) {
 func TestSyncCmd_Idempotent(t *testing.T) {
 	setupSyncTest(t, []string{"skill-a"})
 
+	// Install skills first
+	installAllSkills(t)
+
 	// First sync.
 	root := NewRootCmd()
 	root.SetArgs([]string{"sync"})
@@ -107,20 +124,15 @@ func TestSyncCmd_Prune(t *testing.T) {
 	targetDir := filepath.Join(homeDir, ".config", "opencode", "skills")
 	manifestPath := filepath.Join(homeDir, ".config", "slap", "manifest.json")
 
-	// First sync: install both skills.
-	root := NewRootCmd()
-	root.SetArgs([]string{"sync"})
-	if err := root.Execute(); err != nil {
-		t.Fatalf("first sync failed: %v", err)
-	}
+	// Install skills first
+	installAllSkills(t)
 
 	// Verify both exist.
 	if _, err := os.Stat(filepath.Join(targetDir, "skill-b", "skill.yaml")); os.IsNotExist(err) {
-		t.Fatal("skill-b should exist after first sync")
+		t.Fatal("skill-b should exist after install")
 	}
 
 	// Now we need a new repo that only has skill-a.
-	// The config still points to the old repo, so we create a new repo and update the config.
 	newRepoDir := t.TempDir()
 	createLocalRepo(t, newRepoDir, "main", []string{"skill-a"})
 
@@ -135,7 +147,7 @@ func TestSyncCmd_Prune(t *testing.T) {
 	}
 
 	// Sync with --prune.
-	root = NewRootCmd()
+	root := NewRootCmd()
 	root.SetArgs([]string{"sync", "--prune"})
 	if err := root.Execute(); err != nil {
 		t.Fatalf("sync --prune failed: %v", err)

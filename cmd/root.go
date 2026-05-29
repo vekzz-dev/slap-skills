@@ -79,10 +79,12 @@ func NewRootCmd() *cobra.Command {
 		Short: "Slap Skills — manage opencode skills from a git repo",
 		Long: `Slap Skills syncs opencode skills from any git repo to your local skills directory.
 
-  init   - Configure a git repo as the skill source
-  sync   - Install or update skills from the configured repo
-  list   - List installed skills
-  status - Show drift between local skills and the repo`,
+  init    - Configure a git repo as the skill source
+  install - Select and install skills from the repo
+  remove  - Remove installed skills
+  sync    - Update installed skills from the repo
+  list    - List installed skills
+  status  - Show drift between local skills and the repo`,
 	}
 
 	cmd.PersistentFlags().StringVar(&flagRepo, "repo", "", "Override the configured repo URL")
@@ -90,6 +92,8 @@ func NewRootCmd() *cobra.Command {
 	cmd.PersistentFlags().StringVar(&flagTargetDir, "target-dir", "~/.config/opencode/skills", "Local skills directory")
 
 	cmd.AddCommand(newInitCmd())
+	cmd.AddCommand(newInstallCmd())
+	cmd.AddCommand(newRemoveCmd())
 	cmd.AddCommand(newSyncCmd())
 	cmd.AddCommand(newListCmd())
 	cmd.AddCommand(newStatusCmd())

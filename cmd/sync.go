@@ -117,15 +117,7 @@ from the repo.`,
 				switch a.Type {
 				case sync.ActionAdd:
 					adds++
-					dst := filepath.Join(targetDir, a.Name)
-					if err := copyDir(filepath.Join(tmpDir, a.Name), dst); err != nil {
-						return fmt.Errorf("copying skill %s: %w", a.Name, err)
-					}
-					// Store the local tree SHA so future comparisons are
-					// consistent (ComputeLocalTreeSHA ↔ ComputeLocalTreeSHA).
-					localSHA := computeLocalSHA(dst)
-					m.UpsertSkill(a.Name, localSHA)
-					fmt.Printf("  + %s\n", a.Name)
+					fmt.Printf("  . %s  (available — run 'slap install' to add it)\n", a.Name)
 
 				case sync.ActionUpdate:
 					updates++
@@ -172,7 +164,7 @@ from the repo.`,
 				return fmt.Errorf("saving manifest: %w", err)
 			}
 
-			fmt.Printf("\nSummary: %d added, %d updated, %d removed, %d skipped, %d warnings\n",
+			fmt.Printf("\nSummary: %d available (use 'slap install'), %d updated, %d removed, %d skipped, %d warnings\n",
 				adds, updates, removes, skips, warnings)
 			return nil
 		},
