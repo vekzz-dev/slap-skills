@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/spf13/cobra"
@@ -90,6 +91,10 @@ Use --all to install every skill from the repo without prompting.`,
 					},
 				}
 				if err := survey.AskOne(prompt, &selected, survey.WithPageSize(20)); err != nil {
+					if strings.Contains(err.Error(), "interrupt") {
+						fmt.Println("Cancelled.")
+						return nil
+					}
 					return err
 				}
 				if len(selected) == 0 {
