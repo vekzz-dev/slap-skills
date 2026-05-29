@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vekzz-dev/skills-manager/internal/config"
-	"github.com/vekzz-dev/skills-manager/internal/manifest"
+	"github.com/vekzz-dev/slap-skills/internal/config"
+	"github.com/vekzz-dev/slap-skills/internal/manifest"
 )
 
 func TestStatusCmd_NoConfig(t *testing.T) {

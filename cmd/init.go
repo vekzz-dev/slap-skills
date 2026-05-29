@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/vekzz-dev/skills-manager/internal/config"
+	"github.com/vekzz-dev/slap-skills/internal/config"
 )
 
 // newInitCmd creates the `slap init <repo-url>` command.

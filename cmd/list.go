@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/vekzz-dev/skills-manager/internal/config"
-	"github.com/vekzz-dev/skills-manager/internal/manifest"
+	"github.com/vekzz-dev/slap-skills/internal/config"
+	"github.com/vekzz-dev/slap-skills/internal/manifest"
 )
 
 // list-specific flag.

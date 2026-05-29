@@ -1,0 +1,21 @@
+# Binary
+slap
+slap.exe
+
+# Go test binaries & coverage
+*.test
+*.out
+coverage.out
+
+# Temp files
+/tmp/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

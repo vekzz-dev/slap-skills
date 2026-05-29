@@ -2,8 +2,8 @@
 package sync
 
 import (
-	"github.com/vekzz-dev/skills-manager/internal/manifest"
-	"github.com/vekzz-dev/skills-manager/internal/repo"
+	"github.com/vekzz-dev/slap-skills/internal/manifest"
+	"github.com/vekzz-dev/slap-skills/internal/repo"
 )
 
 // ActionType classifies a sync action.

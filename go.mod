@@ -1,4 +1,4 @@
-module github.com/vekzz-dev/skills-manager
+module github.com/vekzz-dev/slap-skills
 
 go 1.25.10
 

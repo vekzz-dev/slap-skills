@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vekzz-dev/skills-manager/internal/repo"
+	"github.com/vekzz-dev/slap-skills/internal/repo"
 )
 
 func TestMarshalUnmarshalRoundTrip(t *testing.T) {

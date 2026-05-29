@@ -8,10 +8,10 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
-	"github.com/vekzz-dev/skills-manager/internal/config"
-	"github.com/vekzz-dev/skills-manager/internal/manifest"
-	"github.com/vekzz-dev/skills-manager/internal/repo"
-	"github.com/vekzz-dev/skills-manager/internal/sync"
+	"github.com/vekzz-dev/slap-skills/internal/config"
+	"github.com/vekzz-dev/slap-skills/internal/manifest"
+	"github.com/vekzz-dev/slap-skills/internal/repo"
+	"github.com/vekzz-dev/slap-skills/internal/sync"
 )
 
 // sync-specific flag (not persistent on root).

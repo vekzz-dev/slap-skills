@@ -1,0 +1,61 @@
+# openspec/config.yaml
+schema: spec-driven
+
+context: |
+  Tech stack: Go (CLI tool to manage opencode skills installation and updating)
+  Architecture: CLI binary with subcommands; planned package layout under internal/
+  Testing: Go built-in testing (go test); no project test files yet
+  Style: Go standard conventions, gofmt formatting, cobra/pflag for CLI (planned)
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+  apply:
+    - Follow existing code patterns
+    tdd: false
+    test_command: "go test ./..."
+  verify:
+    test_command: "go test -v -count=1 ./..."
+    build_command: "go build ./..."
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas
+
+testing:
+  strict_tdd: false
+  detected: 2026-05-28
+  runner:
+    command: "go test ./..."
+    framework: "Go testing (built-in)"
+  layers:
+    unit:
+      available: true
+      tool: "go test"
+    integration:
+      available: true
+      tool: "go test -tags=integration"
+    e2e:
+      available: false
+      tool: "--"
+  coverage:
+    available: true
+    command: "go test -coverprofile=coverage.out ./..."
+  quality:
+    linter:
+      available: true
+      command: "go vet ./..."
+    type_checker:
+      available: true
+      command: "go vet ./... (static typing via compiler)"
+    formatter:
+      available: true
+      command: "gofmt -l -w ."

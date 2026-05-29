@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vekzz-dev/skills-manager/internal/manifest"
-	"github.com/vekzz-dev/skills-manager/internal/repo"
+	"github.com/vekzz-dev/slap-skills/internal/manifest"
+	"github.com/vekzz-dev/slap-skills/internal/repo"
 )
 
 // makeManifest is a helper to create a manifest with the given skills.

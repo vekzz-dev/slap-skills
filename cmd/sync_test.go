@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vekzz-dev/skills-manager/internal/config"
-	"github.com/vekzz-dev/skills-manager/internal/manifest"
+	"github.com/vekzz-dev/slap-skills/internal/config"
+	"github.com/vekzz-dev/slap-skills/internal/manifest"
 )
 
 // setupSyncTest creates a local source repo, writes a slap config pointing to

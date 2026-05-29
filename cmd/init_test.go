@@ -8,7 +8,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/vekzz-dev/skills-manager/internal/config"
+	"github.com/vekzz-dev/slap-skills/internal/config"
 )
 
 // createLocalRepo initialises a git repository at dir with the given branch

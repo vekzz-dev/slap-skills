@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/vekzz-dev/skills-manager/internal/repo"
+	"github.com/vekzz-dev/slap-skills/internal/repo"
 )
 
 // SkillEntry represents a single installed skill in the manifest.

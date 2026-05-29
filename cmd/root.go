@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/vekzz-dev/skills-manager/internal/repo"
+	"github.com/vekzz-dev/slap-skills/internal/repo"
 )
 
 // Root-level persistent flag values.

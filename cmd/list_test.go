@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vekzz-dev/skills-manager/internal/manifest"
+	"github.com/vekzz-dev/slap-skills/internal/manifest"
 )
 
 // writeManifest creates and saves a manifest at the slap manifest path
