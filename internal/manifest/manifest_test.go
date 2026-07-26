@@ -146,8 +146,8 @@ func TestUpsertSkill(t *testing.T) {
 	m := emptyManifest()
 
 	// Add new skill
-	m.UpsertSkill("foo", "abc123")
-	if !m.HasSkill("foo") {
+	m.UpsertSkill("", "foo", "abc123")
+	if !m.HasSkill("", "foo") {
 		t.Fatal("HasSkill('foo') = false after UpsertSkill")
 	}
 	if m.Skills["foo"].SHA != "abc123" {
@@ -159,7 +159,7 @@ func TestUpsertSkill(t *testing.T) {
 
 	// Update existing skill
 	installedAt := m.Skills["foo"].InstalledAt
-	m.UpsertSkill("foo", "def456")
+	m.UpsertSkill("", "foo", "def456")
 	if m.Skills["foo"].SHA != "def456" {
 		t.Errorf("SHA after update = %q, want %q", m.Skills["foo"].SHA, "def456")
 	}
@@ -170,21 +170,21 @@ func TestUpsertSkill(t *testing.T) {
 
 func TestRemoveSkill(t *testing.T) {
 	m := emptyManifest()
-	m.UpsertSkill("foo", "abc")
-	m.RemoveSkill("foo")
-	if m.HasSkill("foo") {
+	m.UpsertSkill("", "foo", "abc")
+	m.RemoveSkill("", "foo")
+	if m.HasSkill("", "foo") {
 		t.Fatal("HasSkill('foo') = true after RemoveSkill")
 	}
 }
 
 func TestHasSkill(t *testing.T) {
 	m := emptyManifest()
-	if m.HasSkill("nonexistent") {
+	if m.HasSkill("", "nonexistent") {
 		t.Fatal("HasSkill('nonexistent') = true on empty manifest")
 	}
 
-	m.UpsertSkill("bar", "xyz")
-	if !m.HasSkill("bar") {
+	m.UpsertSkill("", "bar", "xyz")
+	if !m.HasSkill("", "bar") {
 		t.Fatal("HasSkill('bar') = false after UpsertSkill")
 	}
 }
@@ -218,15 +218,15 @@ func TestRebuildFromDiskMixedState(t *testing.T) {
 	}
 
 	// Should contain both repo-matching skills
-	if !m.HasSkill("skill-a") {
+	if !m.HasSkill("", "skill-a") {
 		t.Error("Missing skill-a in rebuilt manifest")
 	}
-	if !m.HasSkill("skill-b") {
+	if !m.HasSkill("", "skill-b") {
 		t.Error("Missing skill-b in rebuilt manifest")
 	}
 
 	// Should NOT contain non-managed folder
-	if m.HasSkill("non-managed") {
+	if m.HasSkill("", "non-managed") {
 		t.Error("non-managed folder should not be in rebuilt manifest")
 	}
 
@@ -333,5 +333,176 @@ func TestVersionDefaultsToOne(t *testing.T) {
 	}
 	if loaded.Version != 1 {
 		t.Errorf("Version = %d, want 1", loaded.Version)
+	}
+}
+
+func TestManifestKey(t *testing.T) {
+	tests := []struct {
+		source string
+		name   string
+		want   string
+	}{
+		{"", "foo", "foo"},
+		{"default", "foo", "default:foo"},
+		{"work", "my-skill", "work:my-skill"},
+		{"", "default:foo", "default:foo"},
+	}
+	for _, tt := range tests {
+		got := manifestKey(tt.source, tt.name)
+		if got != tt.want {
+			t.Errorf("manifestKey(%q, %q) = %q, want %q", tt.source, tt.name, got, tt.want)
+		}
+	}
+}
+
+func TestHasSkillWithSource(t *testing.T) {
+	m := emptyManifest()
+	m.UpsertSkill("default", "foo", "abc123")
+
+	if !m.HasSkill("default", "foo") {
+		t.Error("HasSkill('default', 'foo') should be true")
+	}
+	if m.HasSkill("default", "nonexistent") {
+		t.Error("HasSkill('default', 'nonexistent') should be false")
+	}
+	if m.HasSkill("other", "foo") {
+		t.Error("HasSkill('other', 'foo') should be false (wrong source)")
+	}
+	if m.HasSkill("", "foo") {
+		t.Error("HasSkill('', 'foo') should be false (empty source, key = 'default:foo')")
+	}
+}
+
+func TestSkillsBySource(t *testing.T) {
+	m := emptyManifest()
+	m.UpsertSkill("default", "skill-a", "sha1")
+	m.UpsertSkill("default", "skill-b", "sha2")
+	m.UpsertSkill("work", "skill-c", "sha3")
+
+	defaultSkills := m.SkillsBySource("default")
+	if len(defaultSkills) != 2 {
+		t.Errorf("SkillsBySource('default') len = %d, want 2", len(defaultSkills))
+	}
+	if defaultSkills["skill-a"].SHA != "sha1" {
+		t.Errorf("skill-a SHA = %q, want %q", defaultSkills["skill-a"].SHA, "sha1")
+	}
+	if defaultSkills["skill-b"].SHA != "sha2" {
+		t.Errorf("skill-b SHA = %q, want %q", defaultSkills["skill-b"].SHA, "sha2")
+	}
+
+	workSkills := m.SkillsBySource("work")
+	if len(workSkills) != 1 {
+		t.Errorf("SkillsBySource('work') len = %d, want 1", len(workSkills))
+	}
+
+	emptySkills := m.SkillsBySource("nonexistent")
+	if len(emptySkills) != 0 {
+		t.Errorf("SkillsBySource('nonexistent') len = %d, want 0", len(emptySkills))
+	}
+}
+
+func TestRemoveBySource(t *testing.T) {
+	m := emptyManifest()
+	m.UpsertSkill("default", "skill-a", "sha1")
+	m.UpsertSkill("default", "skill-b", "sha2")
+	m.UpsertSkill("work", "skill-c", "sha3")
+
+	removed := m.RemoveBySource("default")
+	if removed != 2 {
+		t.Errorf("RemoveBySource('default') returned %d, want 2", removed)
+	}
+	if m.HasSkill("default", "skill-a") {
+		t.Error("skill-a should be removed")
+	}
+	if m.HasSkill("default", "skill-b") {
+		t.Error("skill-b should be removed")
+	}
+	if !m.HasSkill("work", "skill-c") {
+		t.Error("skill-c should still exist (different source)")
+	}
+
+	removed = m.RemoveBySource("work")
+	if removed != 1 {
+		t.Errorf("RemoveBySource('work') returned %d, want 1", removed)
+	}
+	if len(m.Skills) != 0 {
+		t.Errorf("expected empty manifest, got %d entries", len(m.Skills))
+	}
+}
+
+func TestRemoveSkillWithSource(t *testing.T) {
+	m := emptyManifest()
+	m.UpsertSkill("default", "foo", "abc")
+	m.UpsertSkill("work", "foo", "def") // same name, different source
+
+	m.RemoveSkill("default", "foo")
+	if m.HasSkill("default", "foo") {
+		t.Error("'default:foo' should be removed")
+	}
+	if !m.HasSkill("work", "foo") {
+		t.Error("'work:foo' should still exist")
+	}
+
+	m.RemoveSkill("work", "foo")
+	if m.HasSkill("work", "foo") {
+		t.Error("'work:foo' should be removed")
+	}
+}
+
+func TestUpsertSkillWithSource(t *testing.T) {
+	m := emptyManifest()
+
+	// Add new skill with source
+	m.UpsertSkill("default", "foo", "abc123")
+	if m.Skills["default:foo"].SHA != "abc123" {
+		t.Errorf("SHA = %q, want %q", m.Skills["default:foo"].SHA, "abc123")
+	}
+	if m.Skills["default:foo"].Source != "default" {
+		t.Errorf("Source = %q, want %q", m.Skills["default:foo"].Source, "default")
+	}
+	if m.Skills["default:foo"].InstalledAt.IsZero() {
+		t.Error("InstalledAt should be set")
+	}
+
+	// Update existing skill — InstalledAt should not change
+	installedAt := m.Skills["default:foo"].InstalledAt
+	m.UpsertSkill("default", "foo", "def456")
+	if m.Skills["default:foo"].SHA != "def456" {
+		t.Errorf("SHA after update = %q, want %q", m.Skills["default:foo"].SHA, "def456")
+	}
+	if !m.Skills["default:foo"].InstalledAt.Equal(installedAt) {
+		t.Error("InstalledAt should not change on update")
+	}
+
+	// Add skill with empty source (backward compat)
+	m.UpsertSkill("", "bar", "xyz")
+	if m.Skills["bar"].SHA != "xyz" {
+		t.Errorf("backward compat: SHA = %q, want %q", m.Skills["bar"].SHA, "xyz")
+	}
+}
+
+func TestSkillsBySourceBackwardCompat(t *testing.T) {
+	m := emptyManifest()
+	now := time.Now()
+
+	// Manually set a legacy skill (key = name, Source field not set)
+	m.Skills["legacy-skill"] = SkillEntry{SHA: "old-sha", InstalledAt: now, LastSyncedAt: now}
+
+	// Add a new-style skill
+	m.UpsertSkill("default", "new-skill", "new-sha")
+
+	// SkillsBySource with empty source should include legacy
+	emptySrc := m.SkillsBySource("")
+	if len(emptySrc) != 1 {
+		t.Errorf("SkillsBySource('') len = %d, want 1 (legacy)", len(emptySrc))
+	}
+
+	// SkillsBySource with "default" should include new-skill
+	defaultSrc := m.SkillsBySource("default")
+	if len(defaultSrc) != 1 {
+		t.Errorf("SkillsBySource('default') len = %d, want 1", len(defaultSrc))
+	}
+	if defaultSrc["new-skill"].SHA != "new-sha" {
+		t.Errorf("new-skill SHA = %q, want %q", defaultSrc["new-skill"].SHA, "new-sha")
 	}
 }

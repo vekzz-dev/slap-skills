@@ -14,11 +14,20 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// SourceConfig represents a single source configuration stored in
+// ~/.config/slap/sources/<alias>.yaml.
+type SourceConfig struct {
+	Alias  string `yaml:"alias"`
+	URL    string `yaml:"url"`
+	Branch string `yaml:"branch"`
+}
+
 // Config represents the slap configuration stored in ~/.config/slap/config.yaml.
 type Config struct {
-	RepoURL   string `yaml:"repo_url"`
-	Branch    string `yaml:"branch"`
-	TargetDir string `yaml:"target_dir"`
+	RepoURL   string   `yaml:"repo_url"`
+	Branch    string   `yaml:"branch"`
+	TargetDir string   `yaml:"target_dir"`
+	Sources   []string `yaml:"sources"`
 }
 
 const (
@@ -28,7 +37,84 @@ const (
 	ConfigFile = SlapDir + "/config.yaml"
 	// ManifestFile is the default manifest file path.
 	ManifestFile = SlapDir + "/manifest.json"
+	// SourcesDirName is the name of the sources directory under SlapDir.
+	SourcesDirName = "sources"
 )
+
+// SourcesDir returns the expanded path to the sources directory.
+func SourcesDir() string {
+	return filepath.Join(expandHome(SlapDir), SourcesDirName)
+}
+
+// sourcePath returns the full path to a source YAML file for the given alias.
+func sourcePath(alias string) string {
+	return filepath.Join(SourcesDir(), alias+".yaml")
+}
+
+// CreateSource writes a source config file for the given alias.
+// It creates the sources directory if it does not exist.
+func CreateSource(alias string, sc SourceConfig) error {
+	dir := SourcesDir()
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("creating sources directory: %w", err)
+	}
+	data, err := yaml.Marshal(sc)
+	if err != nil {
+		return fmt.Errorf("marshaling source config: %w", err)
+	}
+	path := sourcePath(alias)
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return fmt.Errorf("writing source file: %w", err)
+	}
+	return nil
+}
+
+// ReadSource reads a source config file for the given alias.
+func ReadSource(alias string) (*SourceConfig, error) {
+	data, err := os.ReadFile(sourcePath(alias))
+	if err != nil {
+		return nil, fmt.Errorf("reading source %q: %w", alias, err)
+	}
+	var sc SourceConfig
+	if err := yaml.Unmarshal(data, &sc); err != nil {
+		return nil, fmt.Errorf("parsing source %q: %w", alias, err)
+	}
+	return &sc, nil
+}
+
+// DeleteSource removes a source config file for the given alias.
+func DeleteSource(alias string) error {
+	path := sourcePath(alias)
+	if err := os.Remove(path); err != nil {
+		return fmt.Errorf("deleting source %q: %w", alias, err)
+	}
+	return nil
+}
+
+// ListSources returns the list of source aliases (YAML file names without
+// extension) in the sources directory. Returns nil, nil if the directory
+// does not exist.
+func ListSources() ([]string, error) {
+	dir := SourcesDir()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("reading sources directory: %w", err)
+	}
+	var aliases []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if strings.HasSuffix(name, ".yaml") {
+			aliases = append(aliases, strings.TrimSuffix(name, ".yaml"))
+		}
+	}
+	return aliases, nil
+}
 
 // expandHome replaces a leading ~/ with the current user's home directory.
 func expandHome(path string) string {
@@ -109,6 +195,69 @@ func (c *Config) ApplyFlagOverrides(repo, branch, targetDir string) {
 	if targetDir != "" {
 		c.TargetDir = targetDir
 	}
+}
+
+// MigrateConfig detects an old-style config (with repo_url set but no sources
+// directory) and migrates it to the multi-source format.
+//
+// Steps:
+//  1. Back up config.yaml → config.yaml.bak
+//  2. Create sources/default.yaml with URL and branch from old config
+//  3. Rewrite config.yaml: remove repo_url/branch, add sources: ["default"]
+//
+// Returns nil when no migration is needed (sources dir already exists, or
+// repo_url is empty).
+func MigrateConfig() error {
+	configPath := expandHome(ConfigFile)
+	if _, err := os.Stat(configPath); err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("checking config: %w", err)
+	}
+
+	cfg, err := Load(ConfigFile)
+	if err != nil {
+		return fmt.Errorf("loading config for migration: %w", err)
+	}
+
+	// Nothing to migrate if repo_url is not set or sources dir already exists.
+	if cfg.RepoURL == "" {
+		return nil
+	}
+	if _, err := os.Stat(SourcesDir()); err == nil {
+		return nil
+	}
+
+	// Step 1: Back up config.yaml
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return fmt.Errorf("reading config for backup: %w", err)
+	}
+	bakPath := configPath + ".bak"
+	if err := os.WriteFile(bakPath, data, 0644); err != nil {
+		return fmt.Errorf("backing up config: %w", err)
+	}
+
+	// Step 2: Create sources/default.yaml
+	defaultSource := SourceConfig{
+		Alias:  "default",
+		URL:    cfg.RepoURL,
+		Branch: cfg.Branch,
+	}
+	if err := CreateSource("default", defaultSource); err != nil {
+		return fmt.Errorf("creating default source: %w", err)
+	}
+
+	// Step 3: Rewrite config — remove repo_url/branch, add sources: ["default"]
+	cfg.Sources = []string{"default"}
+	cfg.RepoURL = ""
+	cfg.Branch = ""
+	if err := cfg.Save(ConfigFile); err != nil {
+		return fmt.Errorf("saving migrated config: %w", err)
+	}
+
+	return nil
 }
 
 // ValidateRepoAccess checks that a git repo is reachable at the given URL

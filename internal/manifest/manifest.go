@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/vekzz-dev/slap-skills/internal/repo"
@@ -13,9 +14,19 @@ import (
 
 // SkillEntry represents a single installed skill in the manifest.
 type SkillEntry struct {
+	Source       string    `json:"source"`
 	SHA          string    `json:"sha"`
 	InstalledAt  time.Time `json:"installed_at"`
 	LastSyncedAt time.Time `json:"last_synced_at"`
+}
+
+// manifestKey returns the internal map key for a source:name pair.
+// When source is empty, returns just name for backward compatibility.
+func manifestKey(source, name string) string {
+	if source == "" {
+		return name
+	}
+	return source + ":" + name
 }
 
 // Manifest tracks the state of all installed skills from a source repo.
@@ -108,23 +119,27 @@ func (m *Manifest) Save(path string) error {
 	return nil
 }
 
-// HasSkill returns true if the given skill name exists in the manifest.
-func (m *Manifest) HasSkill(name string) bool {
-	_, ok := m.Skills[name]
+// HasSkill returns true if a skill with the given source and name exists in
+// the manifest.
+func (m *Manifest) HasSkill(source, name string) bool {
+	_, ok := m.Skills[manifestKey(source, name)]
 	return ok
 }
 
-// UpsertSkill adds or updates a skill entry with the given name and SHA.
-// For new entries, InstalledAt and LastSyncedAt are set to now.
-// For existing entries, only SHA and LastSyncedAt are updated.
-func (m *Manifest) UpsertSkill(name, sha string) {
+// UpsertSkill adds or updates a skill entry with the given source, name, and
+// SHA. For new entries, the Source field is set and InstalledAt and
+// LastSyncedAt are set to now. For existing entries, only SHA and LastSyncedAt
+// are updated.
+func (m *Manifest) UpsertSkill(source, name, sha string) {
+	key := manifestKey(source, name)
 	now := time.Now()
-	if existing, ok := m.Skills[name]; ok {
+	if existing, ok := m.Skills[key]; ok {
 		existing.SHA = sha
 		existing.LastSyncedAt = now
-		m.Skills[name] = existing
+		m.Skills[key] = existing
 	} else {
-		m.Skills[name] = SkillEntry{
+		m.Skills[key] = SkillEntry{
+			Source:       source,
 			SHA:          sha,
 			InstalledAt:  now,
 			LastSyncedAt: now,
@@ -132,9 +147,40 @@ func (m *Manifest) UpsertSkill(name, sha string) {
 	}
 }
 
-// RemoveSkill removes a skill from the manifest by name.
-func (m *Manifest) RemoveSkill(name string) {
-	delete(m.Skills, name)
+// RemoveSkill removes a skill from the manifest by source and name.
+func (m *Manifest) RemoveSkill(source, name string) {
+	delete(m.Skills, manifestKey(source, name))
+}
+
+// SkillsBySource returns a map of skill names to SkillEntry for the given
+// source. The returned map keys are bare skill names (without source prefix).
+func (m *Manifest) SkillsBySource(source string) map[string]SkillEntry {
+	result := make(map[string]SkillEntry)
+	prefix := source + ":"
+	for key, entry := range m.Skills {
+		if entry.Source == source {
+			// Strip source: prefix from key when present to get bare name
+			name := key
+			if source != "" && strings.HasPrefix(key, prefix) {
+				name = strings.TrimPrefix(key, prefix)
+			}
+			result[name] = entry
+		}
+	}
+	return result
+}
+
+// RemoveBySource removes all skills belonging to the given source and returns
+// the number of entries removed.
+func (m *Manifest) RemoveBySource(source string) int {
+	count := 0
+	for key, entry := range m.Skills {
+		if entry.Source == source {
+			delete(m.Skills, key)
+			count++
+		}
+	}
+	return count
 }
 
 // RebuildFromDisk scans targetDir for directories whose names match repo skills,
@@ -180,6 +226,7 @@ func RebuildFromDisk(targetDir string, repoSkills []repo.SkillDir) (*Manifest, e
 		}
 
 		m.Skills[name] = SkillEntry{
+			Source:       "",
 			SHA:          sha,
 			InstalledAt:  now,
 			LastSyncedAt: now,
