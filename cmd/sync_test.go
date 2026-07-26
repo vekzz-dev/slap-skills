@@ -10,9 +10,9 @@ import (
 	"github.com/vekzz-dev/slap-skills/internal/manifest"
 )
 
-// setupSyncTest creates a local source repo, writes a slap config pointing to
-// it via a file:// URL, and returns the home directory.  Callers should set
-// HOME to the returned directory.
+// setupSyncTest creates a local source repo, writes a multi-source slap config
+// pointing to it via a file:// URL, and returns the home directory.  Callers
+// should set HOME to the returned directory.
 func setupSyncTest(t *testing.T, skills []string) (homeDir string) {
 	t.Helper()
 
@@ -22,10 +22,19 @@ func setupSyncTest(t *testing.T, skills []string) (homeDir string) {
 	homeDir = t.TempDir()
 	t.Setenv("HOME", homeDir)
 
+	// Create multi-source config with a "default" source.
+	sourceCfg := config.SourceConfig{
+		Alias:  "default",
+		URL:    "file://" + repoDir,
+		Branch: "main",
+	}
+	if err := config.CreateSource("default", sourceCfg); err != nil {
+		t.Fatalf("creating default source: %v", err)
+	}
+
 	cfg := &config.Config{
-		RepoURL:   "file://" + repoDir,
-		Branch:    "main",
 		TargetDir: "~/.config/opencode/skills",
+		Sources:   []string{"default"},
 	}
 	if err := cfg.Save(config.ConfigFile); err != nil {
 		t.Fatalf("saving config: %v", err)
@@ -72,14 +81,11 @@ func TestSyncCmd_BasicFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loading manifest: %v", err)
 	}
-	if !m.HasSkill("skill-a") {
-		t.Error("manifest missing skill-a")
+	if !m.HasSkill("default", "skill-a") {
+		t.Error("manifest missing skill-a (default)")
 	}
-	if !m.HasSkill("skill-b") {
-		t.Error("manifest missing skill-b")
-	}
-	if m.SourceRepo == "" {
-		t.Error("SourceRepo should be set in manifest")
+	if !m.HasSkill("default", "skill-b") {
+		t.Error("manifest missing skill-b (default)")
 	}
 }
 
@@ -119,6 +125,180 @@ func TestSyncCmd_Idempotent(t *testing.T) {
 	}
 }
 
+func TestSyncCmd_MultiSource(t *testing.T) {
+	// Create two repos with different skills.
+	repoA := t.TempDir()
+	createLocalRepo(t, repoA, "main", []string{"skill-from-a"})
+
+	repoB := t.TempDir()
+	createLocalRepo(t, repoB, "main", []string{"skill-from-b"})
+
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+
+	// Create two sources.
+	if err := config.CreateSource("source-a", config.SourceConfig{
+		Alias:  "source-a",
+		URL:    "file://" + repoA,
+		Branch: "main",
+	}); err != nil {
+		t.Fatalf("creating source-a: %v", err)
+	}
+	if err := config.CreateSource("source-b", config.SourceConfig{
+		Alias:  "source-b",
+		URL:    "file://" + repoB,
+		Branch: "main",
+	}); err != nil {
+		t.Fatalf("creating source-b: %v", err)
+	}
+
+	cfg := &config.Config{
+		TargetDir: "~/.config/opencode/skills",
+		Sources:   []string{"source-a", "source-b"},
+	}
+	if err := cfg.Save(config.ConfigFile); err != nil {
+		t.Fatalf("saving config: %v", err)
+	}
+
+	// Install all skills.
+	root := NewRootCmd()
+	root.SetArgs([]string{"install", "--all"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("install --all failed: %v", err)
+	}
+
+	// Verify both skills are in manifest under their respective sources.
+	manifestPath := filepath.Join(homeDir, ".config", "slap", "manifest.json")
+	m, err := manifest.Load(manifestPath)
+	if err != nil {
+		t.Fatalf("loading manifest: %v", err)
+	}
+	if !m.HasSkill("source-a", "skill-from-a") {
+		t.Error("manifest missing skill-from-a (source-a)")
+	}
+	if !m.HasSkill("source-b", "skill-from-b") {
+		t.Error("manifest missing skill-from-b (source-b)")
+	}
+
+	// Sync should be a no-op (both skills already installed).
+	root = NewRootCmd()
+	root.SetArgs([]string{"sync"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("sync failed: %v", err)
+	}
+
+	// Verify still has both.
+	m, err = manifest.Load(manifestPath)
+	if err != nil {
+		t.Fatalf("reloading manifest: %v", err)
+	}
+	if !m.HasSkill("source-a", "skill-from-a") {
+		t.Error("manifest missing skill-from-a after sync")
+	}
+	if !m.HasSkill("source-b", "skill-from-b") {
+		t.Error("manifest missing skill-from-b after sync")
+	}
+
+	// status should show both.
+	root = NewRootCmd()
+	root.SetArgs([]string{"status"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("status failed: %v", err)
+	}
+
+	// Remove a skill from source-a, verify source-b is untouched.
+	root = NewRootCmd()
+	root.SetArgs([]string{"remove", "source-a:skill-from-a"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("remove source-a:skill-from-a failed: %v", err)
+	}
+
+	m, err = manifest.Load(manifestPath)
+	if err != nil {
+		t.Fatalf("reloading manifest after remove: %v", err)
+	}
+	if m.HasSkill("source-a", "skill-from-a") {
+		t.Error("skill-from-a should be removed")
+	}
+	if !m.HasSkill("source-b", "skill-from-b") {
+		t.Error("skill-from-b should still exist")
+	}
+}
+
+func TestSyncCmd_ErrorIsolation(t *testing.T) {
+	// Create one valid repo.
+	repoA := t.TempDir()
+	createLocalRepo(t, repoA, "main", []string{"skill-from-a"})
+
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+
+	// Source A — valid repo.
+	if err := config.CreateSource("good-source", config.SourceConfig{
+		Alias:  "good-source",
+		URL:    "file://" + repoA,
+		Branch: "main",
+	}); err != nil {
+		t.Fatalf("creating good-source: %v", err)
+	}
+
+	// Source B — unreachable URL (invalid host).
+	if err := config.CreateSource("bad-source", config.SourceConfig{
+		Alias:  "bad-source",
+		URL:    "https://invalid.example.com/unreachable-repo",
+		Branch: "main",
+	}); err != nil {
+		t.Fatalf("creating bad-source: %v", err)
+	}
+
+	cfg := &config.Config{
+		TargetDir: "~/.config/opencode/skills",
+		Sources:   []string{"good-source", "bad-source"},
+	}
+	if err := cfg.Save(config.ConfigFile); err != nil {
+		t.Fatalf("saving config: %v", err)
+	}
+
+	// Install from good-source first (directly, not via --all, to avoid
+	// install's fail-fast behavior which is by design for interactive use).
+	root := NewRootCmd()
+	root.SetArgs([]string{"install", "--all", "--source", "good-source"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("install --all --source good-source failed: %v", err)
+	}
+
+	manifestPath := filepath.Join(homeDir, ".config", "slap", "manifest.json")
+	m, err := manifest.Load(manifestPath)
+	if err != nil {
+		t.Fatalf("loading manifest: %v", err)
+	}
+	if !m.HasSkill("good-source", "skill-from-a") {
+		t.Fatal("skill-from-a (good-source) should be installed")
+	}
+
+	// Now sync — bad-source should fail, good-source should succeed.
+	root = NewRootCmd()
+	root.SetArgs([]string{"sync"})
+	// sync continues despite errors — it doesn't return an error for per-source failures
+	_ = root.Execute()
+
+	m, err = manifest.Load(manifestPath)
+	if err != nil {
+		t.Fatalf("reloading manifest: %v", err)
+	}
+
+	// Good source's skill should still be installed despite the bad source.
+	if !m.HasSkill("good-source", "skill-from-a") {
+		t.Error("skill-from-a (good-source) should survive sync despite bad-source failure")
+	}
+
+	// Bad source should have no skills in the manifest.
+	badSkills := m.SkillsBySource("bad-source")
+	if len(badSkills) != 0 {
+		t.Errorf("bad-source should have no skills after failed clone, got %d", len(badSkills))
+	}
+}
+
 func TestSyncCmd_Prune(t *testing.T) {
 	homeDir := setupSyncTest(t, []string{"skill-a", "skill-b"})
 	targetDir := filepath.Join(homeDir, ".config", "opencode", "skills")
@@ -136,14 +316,14 @@ func TestSyncCmd_Prune(t *testing.T) {
 	newRepoDir := t.TempDir()
 	createLocalRepo(t, newRepoDir, "main", []string{"skill-a"})
 
-	// Update config to point to new repo.
-	cfg := &config.Config{
-		RepoURL:   "file://" + newRepoDir,
-		Branch:    "main",
-		TargetDir: "~/.config/opencode/skills",
+	// Update source to point to new repo (multi-source format).
+	updatedSource := config.SourceConfig{
+		Alias:  "default",
+		URL:    "file://" + newRepoDir,
+		Branch: "main",
 	}
-	if err := cfg.Save(config.ConfigFile); err != nil {
-		t.Fatalf("saving updated config: %v", err)
+	if err := config.CreateSource("default", updatedSource); err != nil {
+		t.Fatalf("updating default source: %v", err)
 	}
 
 	// Sync with --prune.
@@ -168,10 +348,110 @@ func TestSyncCmd_Prune(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loading manifest: %v", err)
 	}
-	if m.HasSkill("skill-b") {
+	if m.HasSkill("default", "skill-b") {
 		t.Error("manifest should not have skill-b after prune")
 	}
-	if !m.HasSkill("skill-a") {
+	if !m.HasSkill("default", "skill-a") {
 		t.Error("manifest should have skill-a after prune")
+	}
+}
+
+func TestSyncCmd_SameNameDiffSource(t *testing.T) {
+	// Create two repos, each with a skill named "foo".
+	repoA := t.TempDir()
+	createLocalRepo(t, repoA, "main", []string{"foo"})
+
+	repoB := t.TempDir()
+	createLocalRepo(t, repoB, "main", []string{"foo"})
+
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+
+	// Source A and Source B.
+	if err := config.CreateSource("source-a", config.SourceConfig{
+		Alias:  "source-a",
+		URL:    "file://" + repoA,
+		Branch: "main",
+	}); err != nil {
+		t.Fatalf("creating source-a: %v", err)
+	}
+	if err := config.CreateSource("source-b", config.SourceConfig{
+		Alias:  "source-b",
+		URL:    "file://" + repoB,
+		Branch: "main",
+	}); err != nil {
+		t.Fatalf("creating source-b: %v", err)
+	}
+
+	cfg := &config.Config{
+		TargetDir: "~/.config/opencode/skills",
+		Sources:   []string{"source-a", "source-b"},
+	}
+	if err := cfg.Save(config.ConfigFile); err != nil {
+		t.Fatalf("saving config: %v", err)
+	}
+
+	// Install from both sources.
+	root := NewRootCmd()
+	root.SetArgs([]string{"install", "--all", "--source", "source-a"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("install --all --source source-a failed: %v", err)
+	}
+
+	root = NewRootCmd()
+	root.SetArgs([]string{"install", "--all", "--source", "source-b"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("install --all --source source-b failed: %v", err)
+	}
+
+	// Verify both foo skills coexist in the manifest with different sources.
+	manifestPath := filepath.Join(homeDir, ".config", "slap", "manifest.json")
+	m, err := manifest.Load(manifestPath)
+	if err != nil {
+		t.Fatalf("loading manifest: %v", err)
+	}
+
+	if !m.HasSkill("source-a", "foo") {
+		t.Error("foo from source-a should be in manifest")
+	}
+	if !m.HasSkill("source-b", "foo") {
+		t.Error("foo from source-b should be in manifest")
+	}
+
+	// Verify SkillsBySource shows correct counts.
+	aSkills := m.SkillsBySource("source-a")
+	bSkills := m.SkillsBySource("source-b")
+
+	if len(aSkills) != 1 {
+		t.Errorf("source-a should have 1 skill, got %d", len(aSkills))
+	}
+	if len(bSkills) != 1 {
+		t.Errorf("source-b should have 1 skill, got %d", len(bSkills))
+	}
+
+	// Verify display: list should show both with alias.
+	root = NewRootCmd()
+	root.SetArgs([]string{"list"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("list failed: %v", err)
+	}
+
+	// Remove one, verify the other remains.
+	root = NewRootCmd()
+	root.SetArgs([]string{"remove", "source-a:foo"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("remove source-a:foo failed: %v", err)
+	}
+
+	m, err = manifest.Load(manifestPath)
+	if err != nil {
+		t.Fatalf("reloading manifest after remove: %v", err)
+	}
+
+	if m.HasSkill("source-a", "foo") {
+		t.Error("foo from source-a should be removed")
+	}
+	if !m.HasSkill("source-b", "foo") {
+		t.Error("foo from source-b should still exist")
 	}
 }

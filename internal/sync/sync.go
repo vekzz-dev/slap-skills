@@ -28,19 +28,24 @@ type Action struct {
 }
 
 // Plan computes the delta between manifest state, local disk state, and repo
-// state. It is a pure function — no side effects — and is fully testable.
+// state for a given source. It is a pure function — no side effects — and is
+// fully testable.
+//
+// The source parameter determines which subset of manifest skills to evaluate
+// (via Manifest.SkillsBySource). When source is empty, only skills with no
+// source (legacy entries) are considered.
 //
 // Comparison matrix:
 //
-//	in manifest? | in repo? | localSHA == manifestSHA? | result
-//	no           | yes      | —                        | add
-//	yes          | yes      | yes, repo==manifest      | skip
-//	yes          | yes      | yes, repo!=manifest      | update
-//	yes          | yes      | no,  repo==manifest      | localModNoRepoChange (warn)
-//	yes          | yes      | no,  repo!=manifest      | localModWithRepoUpdate (warn+overwrite)
-//	yes          | no       | —                        | remove (if prune), else skip
-//	no           | no       | —                        | ignore
-func Plan(m *manifest.Manifest, repoSkills []repo.SkillDir, localSHAs map[string]string, prune bool) []Action {
+//	in manifest (source)? | in repo? | localSHA == manifestSHA? | result
+//	no                    | yes      | —                        | add
+//	yes                   | yes      | yes, repo==manifest      | skip
+//	yes                   | yes      | yes, repo!=manifest      | update
+//	yes                   | yes      | no,  repo==manifest      | localModNoRepoChange (warn)
+//	yes                   | yes      | no,  repo!=manifest      | localModWithRepoUpdate (warn+overwrite)
+//	yes                   | no       | —                        | remove (if prune), else skip
+//	no                    | no       | —                        | ignore
+func Plan(m *manifest.Manifest, repoSkills []repo.SkillDir, localSHAs map[string]string, prune bool, source string) []Action {
 	var actions []Action
 
 	if m == nil {
@@ -53,8 +58,12 @@ func Plan(m *manifest.Manifest, repoSkills []repo.SkillDir, localSHAs map[string
 		repoMap[s.Name] = s
 	}
 
-	// Evaluate each skill in the manifest
-	for name, entry := range m.Skills {
+	// Get skills from the manifest for this source only.
+	// SkillsBySource returns a map keyed by bare skill names.
+	sourceSkills := m.SkillsBySource(source)
+
+	// Evaluate each skill in the manifest for this source
+	for name, entry := range sourceSkills {
 		repoSkill, inRepo := repoMap[name]
 		if !inRepo {
 			// In manifest but absent from repo
@@ -119,9 +128,9 @@ func Plan(m *manifest.Manifest, repoSkills []repo.SkillDir, localSHAs map[string
 		}
 	}
 
-	// Detect new skills in repo that are not in manifest
+	// Detect new skills in repo that are not in manifest for this source
 	for _, s := range repoSkills {
-		if _, inManifest := m.Skills[s.Name]; !inManifest {
+		if !m.HasSkill(source, s.Name) {
 			actions = append(actions, Action{
 				Name:  s.Name,
 				Type:  ActionAdd,

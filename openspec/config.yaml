@@ -4,7 +4,7 @@ schema: spec-driven
 context: |
   Tech stack: Go (CLI tool to manage opencode skills installation and updating)
   Architecture: CLI binary with subcommands; planned package layout under internal/
-  Testing: Go built-in testing (go test); no project test files yet
+  Testing: Go built-in testing (go test); 8 test files across cmd/ and internal/
   Style: Go standard conventions, gofmt formatting, cobra/pflag for CLI (planned)
 
 rules:

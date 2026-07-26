@@ -61,7 +61,7 @@ func TestPlanAddNewSkill(t *testing.T) {
 	repoSk := makeRepoSkills(map[string]string{"new-skill": "abc123"})
 	local := makeLocalSHAs(nil)
 
-	actions := Plan(m, repoSk, local, false)
+	actions := Plan(m, repoSk, local, false, "")
 
 	if !containsAction(actions, "new-skill", ActionAdd) {
 		t.Errorf("expected add action for new-skill, got %v", actionsToString(actions))
@@ -76,7 +76,7 @@ func TestPlanUpdateChangedSkill(t *testing.T) {
 	repoSk := makeRepoSkills(map[string]string{"skill-a": "new-sha"})
 	local := makeLocalSHAs(map[string]string{"skill-a": "old-sha"})
 
-	actions := Plan(m, repoSk, local, false)
+	actions := Plan(m, repoSk, local, false, "")
 
 	if !containsAction(actions, "skill-a", ActionUpdate) {
 		t.Errorf("expected update action for skill-a, got %v", actionsToString(actions))
@@ -88,7 +88,7 @@ func TestPlanSkipUnchangedSkill(t *testing.T) {
 	repoSk := makeRepoSkills(map[string]string{"skill-a": "same-sha"})
 	local := makeLocalSHAs(map[string]string{"skill-a": "same-sha"})
 
-	actions := Plan(m, repoSk, local, false)
+	actions := Plan(m, repoSk, local, false, "")
 
 	if !containsAction(actions, "skill-a", ActionSkip) {
 		t.Errorf("expected skip action for skill-a, got %v", actionsToString(actions))
@@ -100,7 +100,7 @@ func TestPlanRemoveWithPrune(t *testing.T) {
 	repoSk := makeRepoSkills(nil)
 	local := makeLocalSHAs(nil)
 
-	actions := Plan(m, repoSk, local, true)
+	actions := Plan(m, repoSk, local, true, "")
 
 	if !containsAction(actions, "removed-skill", ActionRemove) {
 		t.Errorf("expected remove action for removed-skill with --prune, got %v", actionsToString(actions))
@@ -112,7 +112,7 @@ func TestPlanSkipRemoveWithoutPrune(t *testing.T) {
 	repoSk := makeRepoSkills(nil)
 	local := makeLocalSHAs(nil)
 
-	actions := Plan(m, repoSk, local, false)
+	actions := Plan(m, repoSk, local, false, "")
 
 	if !containsAction(actions, "removed-skill", ActionSkip) {
 		t.Errorf("expected skip action for removed-skill without --prune, got %v", actionsToString(actions))
@@ -124,7 +124,7 @@ func TestPlanLocalModNoRepoChange(t *testing.T) {
 	repoSk := makeRepoSkills(map[string]string{"skill-a": "manifest-sha"})
 	local := makeLocalSHAs(map[string]string{"skill-a": "local-modified-sha"})
 
-	actions := Plan(m, repoSk, local, false)
+	actions := Plan(m, repoSk, local, false, "")
 
 	if !containsAction(actions, "skill-a", ActionLocalModNoRepoChange) {
 		t.Errorf("expected local-mod-no-repo-change for skill-a, got %v", actionsToString(actions))
@@ -136,7 +136,7 @@ func TestPlanLocalModWithRepoUpdate(t *testing.T) {
 	repoSk := makeRepoSkills(map[string]string{"skill-a": "new-repo-sha"})
 	local := makeLocalSHAs(map[string]string{"skill-a": "local-modified-sha"})
 
-	actions := Plan(m, repoSk, local, false)
+	actions := Plan(m, repoSk, local, false, "")
 
 	if !containsAction(actions, "skill-a", ActionLocalModWithRepoUpdate) {
 		t.Errorf("expected local-mod-with-repo-update for skill-a, got %v", actionsToString(actions))
@@ -148,7 +148,7 @@ func TestPlanEmptyManifest(t *testing.T) {
 	repoSk := makeRepoSkills(map[string]string{"skill-a": "abc", "skill-b": "def"})
 	local := makeLocalSHAs(nil)
 
-	actions := Plan(m, repoSk, local, false)
+	actions := Plan(m, repoSk, local, false, "")
 
 	if len(actions) != 2 {
 		t.Errorf("expected 2 actions (add for each repo skill), got %d: %v", len(actions), actionsToString(actions))
@@ -181,7 +181,7 @@ func TestPlanMixedState(t *testing.T) {
 		"add-me":    "does-not-exist-in-repo",
 	})
 
-	actions := Plan(m, repoSk, local, false)
+	actions := Plan(m, repoSk, local, false, "")
 
 	checks := []struct {
 		name string
@@ -222,7 +222,7 @@ func TestPlanMixedStateWithPrune(t *testing.T) {
 		"keep": "same-sha",
 	})
 
-	actions := Plan(m, repoSk, local, true)
+	actions := Plan(m, repoSk, local, true, "")
 
 	if !containsAction(actions, "keep", ActionSkip) {
 		t.Errorf("expected skip for keep, got %v", actionsToString(actions))
@@ -238,7 +238,7 @@ func TestPlanLocalSHAEmptyMeansMissingFolder(t *testing.T) {
 	repoSk := makeRepoSkills(map[string]string{"skill-a": "new-repo-sha"})
 	local := makeLocalSHAs(map[string]string{}) // skill-a not present locally
 
-	actions := Plan(m, repoSk, local, false)
+	actions := Plan(m, repoSk, local, false, "")
 
 	// Since local is missing entirely, we fall to: repo != manifest → update
 	if !containsAction(actions, "skill-a", ActionUpdate) {
@@ -247,9 +247,137 @@ func TestPlanLocalSHAEmptyMeansMissingFolder(t *testing.T) {
 }
 
 func TestPlanNilManifest(t *testing.T) {
-	actions := Plan(nil, nil, nil, false)
+	actions := Plan(nil, nil, nil, false, "")
 	if len(actions) != 0 {
 		t.Errorf("Plan(nil) should return 0 actions, got %d", len(actions))
+	}
+}
+
+func TestPlanWithSource_OnlyShowsSkillsForThatSource(t *testing.T) {
+	// Create a manifest with skills from two different sources.
+	m := &manifest.Manifest{
+		Version: 1,
+		Skills: map[string]manifest.SkillEntry{
+			"work:skill-a": {Source: "work", SHA: "sha-a"},
+			"work:skill-b": {Source: "work", SHA: "sha-b"},
+			"community:skill-c": {Source: "community", SHA: "sha-c"},
+		},
+	}
+	// Repo has skill-a (will be skip since it's in manifest) and skill-d (new)
+	repoSk := makeRepoSkills(map[string]string{"skill-a": "sha-a", "skill-d": "sha-d"})
+	local := makeLocalSHAs(map[string]string{"skill-a": "sha-a"})
+
+	// Plan for "work" source
+	actions := Plan(m, repoSk, local, false, "work")
+
+	// Should see skill-a (skip) and skill-d (add), but NOT skill-c (belongs to community)
+	if !containsAction(actions, "skill-a", ActionSkip) {
+		t.Errorf("expected skip for skill-a from work source, got %v", actionsToString(actions))
+	}
+	if !containsAction(actions, "skill-d", ActionAdd) {
+		t.Errorf("expected add for skill-d (new to work), got %v", actionsToString(actions))
+	}
+	if containsAction(actions, "skill-c", ActionSkip) {
+		t.Errorf("skill-c (community) should not appear in work plan, got %v", actionsToString(actions))
+	}
+}
+
+func TestPlanWithSource_NewSkillNotInSourceIsAdd(t *testing.T) {
+	// skill-a exists in manifest for "work" but repo has it for "community"
+	m := &manifest.Manifest{
+		Version: 1,
+		Skills: map[string]manifest.SkillEntry{
+			"work:skill-a": {Source: "work", SHA: "sha-a"},
+		},
+	}
+	repoSk := makeRepoSkills(map[string]string{"skill-a": "sha-a"})
+	local := makeLocalSHAs(nil)
+
+	// Plan for "community" — skill-a is NOT in manifest for community, so should be "add"
+	actions := Plan(m, repoSk, local, false, "community")
+
+	if !containsAction(actions, "skill-a", ActionAdd) {
+		t.Errorf("expected add for skill-a (not in community source), got %v", actionsToString(actions))
+	}
+}
+
+func TestPlanWithSource_EmptySourceMatchesLegacy(t *testing.T) {
+	// Empty source skills (legacy format)
+	m := &manifest.Manifest{
+		Version: 1,
+		Skills: map[string]manifest.SkillEntry{
+			"skill-a": {Source: "", SHA: "sha-a"},
+			"work:skill-b": {Source: "work", SHA: "sha-b"},
+		},
+	}
+	repoSk := makeRepoSkills(map[string]string{"skill-a": "sha-a", "skill-b": "sha-b"})
+	local := makeLocalSHAs(nil)
+
+	// Plan with empty source — only sees skills with Source == "" (legacy).
+	// skill-a (legacy) should be skip; skill-b (work source) has no legacy entry,
+	// so it appears as "add" from the empty-source perspective (correct: the
+	// manifest key for empty source would be bare "skill-b", and it doesn't exist).
+	actions := Plan(m, repoSk, local, false, "")
+
+	if !containsAction(actions, "skill-a", ActionSkip) {
+		t.Errorf("expected skip for legacy skill-a, got %v", actionsToString(actions))
+	}
+	// skill-b is not a legacy skill (has Source "work"), so from empty-source
+	// view it's a new skill — this is correct backward-compat behavior.
+	if !containsAction(actions, "skill-b", ActionAdd) {
+		t.Errorf("expected add for skill-b (no legacy entry), got %v", actionsToString(actions))
+	}
+}
+
+func TestPlanWithSource_RemovePruneOnlyForSource(t *testing.T) {
+	m := &manifest.Manifest{
+		Version: 1,
+		Skills: map[string]manifest.SkillEntry{
+			"work:gone":   {Source: "work", SHA: "abc"},
+			"work:keep":   {Source: "work", SHA: "def"},
+			"community:nope": {Source: "community", SHA: "ghi"},
+		},
+	}
+	// Repo only has "keep" — "gone" should be remove, "nope" should NOT be touched (different source)
+	repoSk := makeRepoSkills(map[string]string{"keep": "def"})
+	local := makeLocalSHAs(map[string]string{"keep": "def"})
+
+	actions := Plan(m, repoSk, local, true, "work")
+
+	if !containsAction(actions, "gone", ActionRemove) {
+		t.Errorf("expected remove for work:gone, got %v", actionsToString(actions))
+	}
+	if !containsAction(actions, "keep", ActionSkip) {
+		t.Errorf("expected skip for work:keep, got %v", actionsToString(actions))
+	}
+	if containsAction(actions, "nope", ActionRemove) {
+		t.Errorf("community:nope should not be pruned when planning for work, got %v", actionsToString(actions))
+	}
+}
+
+func TestPlanWithSource_UpdateOnlyForSource(t *testing.T) {
+	m := &manifest.Manifest{
+		Version: 1,
+		Skills: map[string]manifest.SkillEntry{
+			"work:skill-a":    {Source: "work", SHA: "old-sha"},
+			"community:skill-a": {Source: "community", SHA: "old-sha"},
+		},
+	}
+	repoSk := makeRepoSkills(map[string]string{"skill-a": "new-sha"})
+	local := makeLocalSHAs(map[string]string{"skill-a": "old-sha"})
+
+	// Plan for work — should see update for work:skill-a
+	actions := Plan(m, repoSk, local, false, "work")
+
+	if !containsAction(actions, "skill-a", ActionUpdate) {
+		t.Errorf("expected update for work:skill-a, got %v", actionsToString(actions))
+	}
+
+	// Plan for community — should also see update for community:skill-a
+	actions2 := Plan(m, repoSk, local, false, "community")
+
+	if !containsAction(actions2, "skill-a", ActionUpdate) {
+		t.Errorf("expected update for community:skill-a, got %v", actionsToString(actions2))
 	}
 }
 

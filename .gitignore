@@ -22,3 +22,6 @@ Thumbs.db
 
 # SDD internal state (auto-generated, local paths)
 .atl/
+
+# CodeGraph local index (auto-generated)
+.codegraph/
