@@ -148,7 +148,7 @@ new, missing, or locally modified.`,
 			cfg, err := config.Load(config.ConfigFile)
 			if err != nil {
 				if errors.Is(err, os.ErrNotExist) {
-					return fmt.Errorf("slap is not configured. Run 'slap init <repo-url>' first")
+					return fmt.Errorf("slap is not configured. Run 'slap source add' to add a source")
 				}
 				return fmt.Errorf("loading config: %w", err)
 			}

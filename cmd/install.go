@@ -91,7 +91,7 @@ Use --source to limit to a specific source alias.`,
 
 			cfg, err := config.Load(expandPath(config.ConfigFile))
 			if err != nil {
-				return fmt.Errorf("slap is not configured. Run 'slap init <repo-url>' first")
+				return fmt.Errorf("slap is not configured. Run 'slap source add' to add a source")
 			}
 			if cobraCmd.Flags().Changed("target-dir") {
 				cfg.TargetDir = flagTargetDir

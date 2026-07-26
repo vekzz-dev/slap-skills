@@ -74,16 +74,16 @@ func TestInitCmd_ValidURL(t *testing.T) {
 		t.Fatalf("init with valid URL failed: %v", err)
 	}
 
-	// Verify the config file was created and contains the right values.
-	cfg, err := config.Load(config.ConfigFile)
+	// Verify the source file was created.
+	src, err := config.ReadSource("default")
 	if err != nil {
-		t.Fatalf("loading config after init: %v", err)
+		t.Fatalf("reading source 'default' after init: %v", err)
 	}
-	if cfg.RepoURL != repoURL {
-		t.Errorf("RepoURL = %q, want %q", cfg.RepoURL, repoURL)
+	if src.URL != repoURL {
+		t.Errorf("Source URL = %q, want %q", src.URL, repoURL)
 	}
-	if cfg.Branch != "main" {
-		t.Errorf("Branch = %q, want %q", cfg.Branch, "main")
+	if src.Branch != "main" {
+		t.Errorf("Source Branch = %q, want %q", src.Branch, "main")
 	}
 }
 
@@ -121,11 +121,11 @@ func TestInitCmd_SavesBranchFromFlag(t *testing.T) {
 		t.Fatalf("init with --branch failed: %v", err)
 	}
 
-	cfg, err := config.Load(config.ConfigFile)
+	src, err := config.ReadSource("default")
 	if err != nil {
-		t.Fatalf("loading config: %v", err)
+		t.Fatalf("reading source 'default': %v", err)
 	}
-	if cfg.Branch != "develop" {
-		t.Errorf("Branch = %q, want %q", cfg.Branch, "develop")
+	if src.Branch != "develop" {
+		t.Errorf("Source Branch = %q, want %q", src.Branch, "develop")
 	}
 }
