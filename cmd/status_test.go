@@ -49,8 +49,8 @@ func TestStatusCmd_UpToDate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loading manifest: %v", err)
 	}
-	if !m.HasSkill("skill-a") {
-		t.Error("manifest should have skill-a")
+	if !m.HasSkill("default", "skill-a") {
+		t.Error("manifest should have skill-a (default)")
 	}
 }
 
@@ -84,14 +84,14 @@ func TestStatusCmd_NewSkillInRepo(t *testing.T) {
 	newRepoDir := t.TempDir()
 	createLocalRepo(t, newRepoDir, "main", []string{"skill-a", "skill-b"})
 
-	// Update config to point to new repo.
-	cfg := &config.Config{
-		RepoURL:   "file://" + newRepoDir,
-		Branch:    "main",
-		TargetDir: "~/.config/opencode/skills",
+	// Update source to point to new repo.
+	updatedSource := config.SourceConfig{
+		Alias:  "default",
+		URL:    "file://" + newRepoDir,
+		Branch: "main",
 	}
-	if err := cfg.Save(config.ConfigFile); err != nil {
-		t.Fatalf("saving updated config: %v", err)
+	if err := config.CreateSource("default", updatedSource); err != nil {
+		t.Fatalf("updating default source: %v", err)
 	}
 
 	// Status should detect skill-b as "new" (available but not installed).

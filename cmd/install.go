@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,21 +15,87 @@ import (
 	"github.com/vekzz-dev/slap-skills/internal/repo"
 )
 
+// availableSkill bundles a skill from a specific source for display.
+type availableSkill struct {
+	Name    string
+	Source  string
+	SHA     string
+	TempDir string // path to cloned repo temp dir for this source
+}
+
+// installAvailableForSource clones a single source and returns available skills
+// (not yet installed for that source), with the source alias attached.
+// The caller is responsible for cleaning up the returned TempDir for each skill
+// (they all share the same dir for a given source).
+func installAvailableForSource(ctx context.Context, alias string, m *manifest.Manifest) ([]availableSkill, string, error) {
+	src, err := config.ReadSource(alias)
+	if err != nil {
+		return nil, "", fmt.Errorf("reading source %q: %w", alias, err)
+	}
+
+	tmpDir, err := os.MkdirTemp("", "slap-install-"+alias+"-*")
+	if err != nil {
+		return nil, "", fmt.Errorf("creating temp dir for %q: %w", alias, err)
+	}
+
+	client := &repo.Client{URL: src.URL, Branch: src.Branch}
+	if err := client.CloneShallow(ctx, tmpDir); err != nil {
+		os.RemoveAll(tmpDir)
+		return nil, "", fmt.Errorf("cloning %q: %w", alias, err)
+	}
+
+	repoSkills, err := client.ListSkillDirs(ctx, tmpDir)
+	if err != nil {
+		os.RemoveAll(tmpDir)
+		return nil, "", fmt.Errorf("listing skills in %q: %w", alias, err)
+	}
+
+	// Convert repo tree SHAs to local format
+	for i := range repoSkills {
+		sp := filepath.Join(tmpDir, repoSkills[i].Name)
+		if sha, computeErr := repo.ComputeLocalTreeSHA(sp); computeErr == nil {
+			repoSkills[i].TreeSHA = sha
+		}
+	}
+
+	var result []availableSkill
+	for _, s := range repoSkills {
+		if !m.HasSkill(alias, s.Name) {
+			result = append(result, availableSkill{
+				Name:    s.Name,
+				Source:  alias,
+				SHA:     s.TreeSHA,
+				TempDir: tmpDir,
+			})
+		}
+	}
+	return result, tmpDir, nil
+}
+
 func newInstallCmd() *cobra.Command {
 	var installAll bool
+	var installSource string
 
 	cmd := &cobra.Command{
 		Use:   "install",
-		Short: "Select and install skills from the repo",
-		Long: `List available skills from the configured repo and install the ones you choose.
+		Short: "Select and install skills from sources",
+		Long: `List available skills from configured sources and install the ones you choose.
 
-Use --all to install every skill from the repo without prompting.`,
+Use --all to install every skill without prompting.
+Use --source to limit to a specific source alias.`,
 		RunE: func(cobraCmd *cobra.Command, args []string) error {
+			// Run migration first.
+			if err := config.MigrateConfig(); err != nil {
+				return fmt.Errorf("config migration: %w", err)
+			}
+
 			cfg, err := config.Load(expandPath(config.ConfigFile))
 			if err != nil {
 				return fmt.Errorf("slap is not configured. Run 'slap init <repo-url>' first")
 			}
-			cfg.ApplyFlagOverrides(flagRepo, flagBranch, flagTargetDir)
+			if cobraCmd.Flags().Changed("target-dir") {
+				cfg.TargetDir = flagTargetDir
+			}
 
 			targetDir := expandPath(cfg.TargetDir)
 			manifestPath := expandPath(config.ManifestFile)
@@ -38,54 +105,88 @@ Use --all to install every skill from the repo without prompting.`,
 				return fmt.Errorf("loading manifest: %w", err)
 			}
 
-			// Clone repo to temp dir
-			tmpDir, err := os.MkdirTemp("", "slap-install-*")
-			if err != nil {
-				return err
-			}
-			defer os.RemoveAll(tmpDir)
-
-			client := &repo.Client{URL: cfg.RepoURL, Branch: cfg.Branch}
-			if err := client.CloneShallow(cobraCmd.Context(), tmpDir); err != nil {
-				return fmt.Errorf("cloning repo: %w", err)
-			}
-
-			repoSkills, err := client.ListSkillDirs(cobraCmd.Context(), tmpDir)
-			if err != nil {
-				return fmt.Errorf("listing skills: %w", err)
-			}
-
-			// Convert repo tree SHAs to local format
-			for i := range repoSkills {
-				sp := filepath.Join(tmpDir, repoSkills[i].Name)
-				if sha, computeErr := repo.ComputeLocalTreeSHA(sp); computeErr == nil {
-					repoSkills[i].TreeSHA = sha
+			// Determine which sources to scan
+			sourceAliases := cfg.Sources
+			if installSource != "" {
+				// Validate the requested source exists
+				found := false
+				for _, a := range sourceAliases {
+					if a == installSource {
+						found = true
+						break
+					}
 				}
-			}
-
-			// Filter: only skills not already installed
-			var available []string
-			for _, s := range repoSkills {
-				if !m.HasSkill(s.Name) {
-					available = append(available, s.Name)
+				if !found {
+					return fmt.Errorf("source %q is not configured", installSource)
 				}
+				sourceAliases = []string{installSource}
 			}
 
-			if len(available) == 0 {
-				fmt.Println("All skills from the repo are already installed.")
+			if len(sourceAliases) == 0 {
+				return fmt.Errorf("no sources configured. Run 'slap source add' to add one")
+			}
+
+			// Collect available skills from all relevant sources
+			ctx := context.Background()
+			var allAvailable []availableSkill
+			var tmpDirs []string
+
+			for _, alias := range sourceAliases {
+				avail, tmpDir, srcErr := installAvailableForSource(ctx, alias, m)
+				if srcErr != nil {
+					// Clean up any temp dirs from previous sources
+					for _, d := range tmpDirs {
+						os.RemoveAll(d)
+					}
+					return fmt.Errorf("scanning source %q: %w", alias, srcErr)
+				}
+				tmpDirs = append(tmpDirs, tmpDir)
+				allAvailable = append(allAvailable, avail...)
+			}
+
+			// Ensure cleanup of all temp dirs
+			defer func() {
+				for _, d := range tmpDirs {
+					os.RemoveAll(d)
+				}
+			}()
+
+			if len(allAvailable) == 0 {
+				fmt.Println("All skills from the configured sources are already installed.")
 				return nil
 			}
 
-			// Sort alphabetically
-			sort.Strings(available)
+			// Build display options and lookup maps
+			var displayOptions []string
+			optionToSkill := make(map[string]availableSkill)
+			bareNameToSkill := make(map[string]availableSkill)
+
+			for _, as := range allAvailable {
+				// Keep the first occurrence for bare name dedup
+				if _, exists := bareNameToSkill[as.Name]; !exists {
+					bareNameToSkill[as.Name] = as
+				}
+
+				var label string
+				if installSource != "" {
+					label = as.Name
+				} else {
+					label = fmt.Sprintf("%s (%s)", as.Name, as.Source)
+				}
+				// Deduplicate label
+				if _, exists := optionToSkill[label]; !exists {
+					optionToSkill[label] = as
+					displayOptions = append(displayOptions, label)
+				}
+			}
+			sort.Strings(displayOptions)
 
 			var selected []string
 
 			if !installAll {
-				// Interactive multi-select with arrow keys, space, enter
 				prompt := &survey.MultiSelect{
 					Message: "Select skills to install:",
-					Options: available,
+					Options: displayOptions,
 					Description: func(value string, index int) string {
 						return ""
 					},
@@ -102,26 +203,28 @@ Use --all to install every skill from the repo without prompting.`,
 					return nil
 				}
 			} else {
-				selected = available
-			}
-
-			// Build a lookup by name
-			skillMap := make(map[string]repo.SkillDir, len(repoSkills))
-			for _, s := range repoSkills {
-				skillMap[s.Name] = s
+				selected = displayOptions
 			}
 
 			// Install each selected skill
-			for _, name := range selected {
-				s := skillMap[name]
-				src := filepath.Join(tmpDir, s.Name)
-				dst := filepath.Join(targetDir, s.Name)
+			for _, label := range selected {
+				skill, ok := optionToSkill[label]
+				if !ok {
+					// Fallback to bare name for --all mode
+					skill, ok = bareNameToSkill[label]
+					if !ok {
+						return fmt.Errorf("internal error: unknown skill %q", label)
+					}
+				}
+
+				src := filepath.Join(skill.TempDir, skill.Name)
+				dst := filepath.Join(targetDir, skill.Name)
 				if err := copyDir(src, dst); err != nil {
-					return fmt.Errorf("installing %s: %w", s.Name, err)
+					return fmt.Errorf("installing %s from %q: %w", skill.Name, skill.Source, err)
 				}
 				localSHA := computeLocalSHA(dst)
-				m.UpsertSkill(s.Name, localSHA)
-				fmt.Printf("  + %s\n", s.Name)
+				m.UpsertSkill(skill.Source, skill.Name, localSHA)
+				fmt.Printf("  + %s (%s)\n", skill.Name, skill.Source)
 			}
 
 			if err := m.Save(manifestPath); err != nil {
@@ -131,12 +234,13 @@ Use --all to install every skill from the repo without prompting.`,
 			if installAll {
 				fmt.Printf("\nInstalled %d skill(s).\n", len(selected))
 			} else {
-				fmt.Printf("\nInstalled %d of %d available skill(s).\n", len(selected), len(available))
+				fmt.Printf("\nInstalled %d of %d available skill(s).\n", len(selected), len(allAvailable))
 			}
 			return nil
 		},
 	}
 
-	cmd.Flags().BoolVar(&installAll, "all", false, "Install all skills from the repo without prompting")
+	cmd.Flags().BoolVar(&installAll, "all", false, "Install all skills without prompting")
+	cmd.Flags().StringVar(&installSource, "source", "", "Only show skills from the given source alias")
 	return cmd
 }

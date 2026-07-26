@@ -88,7 +88,8 @@ func TestListCmd_JSONOutput(t *testing.T) {
 	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil {
 		t.Fatalf("output is not valid JSON: %v\n%s", err, buf.String())
 	}
-	if !parsed.HasSkill("json-skill") {
+	// JSON output contains the full skills map — check raw key presence
+	if _, exists := parsed.Skills["json-skill"]; !exists {
 		t.Error("JSON output missing json-skill")
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -58,14 +59,24 @@ func printManifestJSON(w io.Writer, m *manifest.Manifest) error {
 // printManifestTable renders a human-friendly table of installed skills to w.
 func printManifestTable(w io.Writer, m *manifest.Manifest) error {
 	tw := tabwriter.NewWriter(w, 0, 0, 3, ' ', 0)
-	fmt.Fprintln(tw, "Skill Name\tSHA\tInstalled\tLast Synced")
-	for name, entry := range m.Skills {
+	fmt.Fprintln(tw, "Skill Name\tSource\tSHA\tInstalled\tLast Synced")
+	for key, entry := range m.Skills {
 		sha := entry.SHA
 		if len(sha) > 7 {
 			sha = sha[:7]
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n",
-			name, sha,
+		// Derive bare name from key (which is "source:name" for source entries)
+		bareName := key
+		if entry.Source != "" {
+			bareName = strings.TrimPrefix(key, entry.Source+":")
+		}
+		// Display "name (alias)" format
+		sourceDisplay := entry.Source
+		if sourceDisplay == "" {
+			sourceDisplay = "-"
+		}
+		fmt.Fprintf(tw, "%s (%s)\t%s\t%s\t%s\t%s\n",
+			bareName, sourceDisplay, sourceDisplay, sha,
 			entry.InstalledAt.Format(time.RFC3339),
 			entry.LastSyncedAt.Format(time.RFC3339),
 		)
