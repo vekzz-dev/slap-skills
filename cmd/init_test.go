@@ -121,7 +121,7 @@ func TestInitCmd_NoArgsWithSources(t *testing.T) {
 		t.Fatalf("saving config: %v", err)
 	}
 
-	// init with no args should show sources (not error).
+	// init with no args should say already configured (not error).
 	root := NewRootCmd()
 	root.SetArgs([]string{"init"})
 	if err := root.Execute(); err != nil {

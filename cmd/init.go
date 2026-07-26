@@ -30,17 +30,7 @@ If a URL is provided, adds it as a source (equivalent to 'slap source add').`,
 			if len(args) == 0 {
 				aliases, err := config.ListSources()
 				if err == nil && len(aliases) > 0 {
-					// Sources exist — show them.
-					fmt.Println("Slap is already configured with the following sources:")
-					for _, alias := range aliases {
-						src, srcErr := config.ReadSource(alias)
-						if srcErr != nil {
-							fmt.Printf("  %s  (<error reading>)\n", alias)
-							continue
-						}
-						fmt.Printf("  %s  %s (%s)\n", src.Alias, src.URL, src.Branch)
-					}
-					fmt.Println("\nRun 'slap source add' to add another, or 'slap sync' to install skills.")
+					fmt.Println("Slap is already configured. Use 'slap source add' to add more sources.")
 					return nil
 				}
 
