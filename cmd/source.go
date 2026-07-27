@@ -99,6 +99,26 @@ is reachable and that the alias does not conflict with existing sources.`,
 				return fmt.Errorf("saving source: %w", err)
 			}
 
+			// Step 5: Ensure config.yaml exists with this source in its Sources list.
+			// This is needed so sync/install can find configured sources.
+			cfg, loadErr := config.Load(config.ConfigFile)
+			if loadErr != nil {
+				cfg = &config.Config{TargetDir: "~/.config/opencode/skills"}
+			}
+			found := false
+			for _, s := range cfg.Sources {
+				if s == alias {
+					found = true
+					break
+				}
+			}
+			if !found {
+				cfg.Sources = append(cfg.Sources, alias)
+			}
+			if err := cfg.Save(config.ConfigFile); err != nil {
+				return fmt.Errorf("saving config: %w", err)
+			}
+
 			fmt.Printf("Source %q added.\n", alias)
 			return nil
 		},
