@@ -9,13 +9,14 @@
 
 [🇬🇧 English](README.md)
 
-**Slap Skills** es para los que no confían en skills de terceros bajadas con `npx` o herramientas similares. Dueño de tu workflow. Tus skills en tu propio repo git — público o privado — y sincronizadas a tu máquina con un solo comando. Sin npx, sin registros, sin dependencias de terceros. Solo git y un `slap sync`.
+**Slap Skills** es para los que no confían en skills de terceros. Dueño de tu workflow. Tus skills en tus propios repos git — públicos o privados — y sincronizadas a tu máquina con un solo comando. Sin npx, sin registros, sin dependencias de terceros. Solo git y un `slap sync`.
 
 ```bash
 brew tap vekzz-dev/tap
 brew install slap-skills
 
-slap init https://github.com/usuario/tus-skills
+slap init
+slap source add --alias trabajo https://github.com/usuario/skills-laburo
 slap sync
 ```
 
@@ -24,19 +25,22 @@ slap sync
 ## Inicio rápido
 
 ```bash
-# 1. Configurá tu repo de skills
-slap init https://github.com/usuario/tus-skills
+# 1. Ejecutá el wizard de configuración (interactivo)
+slap init
 
-# 2. Instalá las skills (elegís cuáles, o --all)
+# 2. O agregá una fuente directamente
+slap source add
+
+# 3. Instalá las skills (elegís cuáles, o --all)
 slap install --all
 
-# 3. Mantenelas actualizadas
+# 4. Mantenelas actualizadas
 slap sync
 
-# 4. Mirá qué tenés instalado
+# 5. Mirá qué tenés instalado
 slap list
 
-# 5. Revisá si hay actualizaciones
+# 6. Revisá si hay actualizaciones
 slap status
 ```
 
@@ -67,24 +71,27 @@ Descargá el binario de [GitHub Releases](https://github.com/vekzz-dev/slap-skil
 
 | Comando | Descripción |
 |---------|-------------|
-| `slap init <repo-url>` | Configurá un repo git como fuente de skills |
-| `slap install` | Seleccioná qué skills instalar del repo |
-| `slap install --all` | Instalá todas las skills del repo sin preguntar |
-| `slap sync` | Actualizá las skills instaladas desde el repo |
-| `slap sync --prune` | Sincronizá y eliminá skills locales que ya no están en el repo |
-| `slap list` | Listá skills instaladas |
-| `slap list --json` | Listá skills instaladas en JSON |
-| `slap status` | Mostrá diferencias entre skills locales y el repo |
-| `slap remove <skill>` | Eliminá una skill instalada |
+| `slap init` | Wizard de configuración inicial (agrega tu primera fuente) |
+| `slap source add` | Interactivo: agregá una nueva fuente con alias |
+| `slap source list` | Listá todas las fuentes configuradas |
+| `slap source remove <alias>` | Eliminá una fuente (pregunta si desinstalar sus skills) |
+| `slap install` | Seleccioná qué skills instalar de todas las fuentes |
+| `slap install --all` | Instalá todas las skills sin preguntar |
+| `slap install --source <alias>` | Instalá solo de una fuente específica |
+| `slap sync` | Actualizá las skills instaladas desde todas las fuentes |
+| `slap sync --prune` | Sincronizá y eliminá skills que ya no están en ninguna fuente |
+| `slap list` | Listá skills instaladas (muestra `nombre (fuente)`) |
+| `slap list --json` | Listá skills instaladas en JSON (incluye campo `source`) |
+| `slap status` | Mostrá diferencias por fuente entre local y remoto |
+| `slap remove <skill>` | Eliminá una skill por nombre |
+| `slap remove <fuente>:<skill>` | Eliminá una skill de una fuente específica |
 | `slap remove --all` | Eliminá todas las skills y limpiá el manifest |
 | `slap version` | Mostrá la versión actual |
-| `slap --version` | Mostrá la versión actual (flag corto) |
 
 ### Flags globales
 
 | Flag | Default | Descripción |
 |------|---------|-------------|
-| `--repo` | (del config) | Sobreescribí la URL del repo |
 | `--branch` | `main` | Branch a sincronizar |
 | `--target-dir` | `~/.config/opencode/skills` | Directorio local de skills |
 
@@ -94,31 +101,40 @@ Descargá el binario de [GitHub Releases](https://github.com/vekzz-dev/slap-skil
 
 ```
 ~/.config/slap/
-├── config.yaml        ← URL del repo, branch, target dir
-└── manifest.json      ← Skills trackeadas con tree SHAs
+├── config.yaml            ← Lista de fuentes, target dir
+├── sources/
+│   ├── default.yaml       ← Config de fuente (alias, url, branch)
+│   ├── trabajo.yaml
+│   └── comunidad.yaml
+└── manifest.json          ← Skills trackeadas con fuente y tree SHA
 
 ~/.config/opencode/skills/
-├── sdd-init/          ← Otras skills (nunca se tocan)
-├── tu-skill-1/        ← Instalada por Slap
-└── tu-skill-2/        ← Instalada por Slap
+├── sdd-init/              ← Otras skills (nunca se tocan)
+├── tu-skill-1/            ← Instalada por Slap
+└── tu-skill-2/            ← Instalada por Slap
 ```
 
 Cada sync:
-1. **Pre-vuelo** — carga el config, carga o repara el manifest
-2. **Clone** — clona shallow tu repo a un directorio temporal
-3. **Plan** — compara estado del manifest × estado del repo × estado del disco local
+1. **Pre-vuelo** — carga el config y las fuentes, carga o repara el manifest
+2. **Clone por fuente** — clona shallow cada repo fuente a un directorio temporal aislado
+3. **Plan por fuente** — compara estado del manifest × estado del repo × estado del disco local para cada fuente
 4. **Ejecuta** — agrega skills nuevas, actualiza las cambiadas, opcionalmente elimina las borradas
-5. **Guarda** — escribe el manifest atómicamente
+5. **Guarda** — escribe el manifest atómicamente una sola vez
+
+### Visualización
+
+Las skills siempre se muestran con su fuente: `skill-name (source-alias). Esto deja claro de dónde viene cada skill, especialmente cuando el mismo nombre existe en múltiples fuentes.
 
 ### Robustez
 
 | Caso | Comportamiento |
 |------|----------------|
-| Manifest perdido | Reconstruye escaneando el directorio de skills contra el repo |
+| Manifest perdido | Reconstruye escaneando el directorio de skills contra las fuentes |
 | Manifest corrupto | Hace backup a `.json.bak` y reconstruye |
-| Skill editada localmente | Avisa pero preserva tus cambios si el repo no cambió |
-| Skill editada localmente + repo actualizado | Avisa y sobreescribe con la versión del repo |
-| Carpeta de skill borrada a mano | Reinstala desde el repo |
+| Skill editada localmente | Avisa pero preserva tus cambios si la fuente no cambió |
+| Skill editada localmente + fuente actualizada | Avisa y sobreescribe con la versión de la fuente |
+| Carpeta de skill borrada a mano | Reinstala desde la fuente |
+| Una fuente no disponible | Las otras fuentes siguen sincronizando (aislamiento por fuente) |
 | Skills no gestionadas | Nunca se leen, comparan ni modifican |
 
 ---

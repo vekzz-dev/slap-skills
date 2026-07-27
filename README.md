@@ -9,13 +9,14 @@
 
 [🇪🇸 Español](README.es.md)
 
-**Slap Skills** is for those who don't trust random skills from the internet. Own your workflow. Keep your AI agent skills in your own git repo — public or private — and sync them to your machine with one command. No npx, no registries, no third-party dependencies. Just git and a `slap sync`.
+**Slap Skills** is for those who don't trust random skills from the internet. Own your workflow. Keep your AI agent skills in your own git repos — public or private — and sync them to your machine with one command. No npx, no registries, no third-party dependencies. Just git and a `slap sync`.
 
 ```bash
 brew tap vekzz-dev/tap
 brew install slap-skills
 
-slap init https://github.com/user/your-skills
+slap init
+slap source add --alias work https://github.com/user/work-skills
 slap sync
 ```
 
@@ -24,19 +25,22 @@ slap sync
 ## Quick start
 
 ```bash
-# 1. Configure your skill repo
-slap init https://github.com/user/your-skills
+# 1. Run the setup wizard (interactive)
+slap init
 
-# 2. Install skills (choose which ones, or --all)
+# 2. Or add a source directly
+slap source add
+
+# 3. Install skills (choose which ones, or --all)
 slap install --all
 
-# 3. Keep them updated
+# 4. Keep them updated
 slap sync
 
-# 4. See what's installed
+# 5. See what's installed
 slap list
 
-# 5. Check for updates
+# 6. Check for updates
 slap status
 ```
 
@@ -67,24 +71,27 @@ Download the latest binary from [GitHub Releases](https://github.com/vekzz-dev/s
 
 | Command | Description |
 |---------|-------------|
-| `slap init <repo-url>` | Configure a git repo as the skill source |
-| `slap install` | Select which skills to install from the repo |
-| `slap install --all` | Install all skills from the repo without prompting |
-| `slap sync` | Update installed skills from the repo |
-| `slap sync --prune` | Sync and remove local skills no longer in the repo |
-| `slap list` | List installed skills |
-| `slap list --json` | List installed skills as JSON |
-| `slap status` | Show drift between local skills and the repo |
-| `slap remove <skill>` | Remove a specific installed skill |
+| `slap init` | One-time setup wizard (adds your first source) |
+| `slap source add` | Interactive: add a new skill source with alias |
+| `slap source list` | List all configured sources |
+| `slap source remove <alias>` | Remove a source (prompts to uninstall its skills) |
+| `slap install` | Select which skills to install from all sources |
+| `slap install --all` | Install all skills without prompting |
+| `slap install --source <alias>` | Install only from a specific source |
+| `slap sync` | Update installed skills from all sources |
+| `slap sync --prune` | Sync and remove skills no longer in any source |
+| `slap list` | List installed skills (shows `name (source)`) |
+| `slap list --json` | List installed skills as JSON (includes `source` field) |
+| `slap status` | Show drift per source between local and remote |
+| `slap remove <skill>` | Remove a skill by name |
+| `slap remove <source>:<skill>` | Remove a skill from a specific source |
 | `slap remove --all` | Remove all installed skills and clean the manifest |
 | `slap version` | Print the current version |
-| `slap --version` | Print the current version (short flag) |
 
 ### Global flags
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--repo` | (from config) | Override repo URL |
 | `--branch` | `main` | Git branch to sync from |
 | `--target-dir` | `~/.config/opencode/skills` | Local skills directory |
 
@@ -94,31 +101,40 @@ Download the latest binary from [GitHub Releases](https://github.com/vekzz-dev/s
 
 ```
 ~/.config/slap/
-├── config.yaml        ← Your repo URL, branch, target dir
-└── manifest.json      ← Tracked skills with tree SHAs
+├── config.yaml            ← Sources list, target dir
+├── sources/
+│   ├── default.yaml       ← Source config (alias, url, branch)
+│   ├── work.yaml
+│   └── community.yaml
+└── manifest.json          ← Tracked skills with source and tree SHAs
 
 ~/.config/opencode/skills/
-├── sdd-init/          ← Other skills (never touched)
-├── your-skill-1/      ← Installed by Slap
-└── your-skill-2/      ← Installed by Slap
+├── sdd-init/              ← Other skills (never touched)
+├── your-skill-1/          ← Installed by Slap
+└── your-skill-2/          ← Installed by Slap
 ```
 
 Each sync:
-1. **Pre-flight** — loads config, loads or repairs the manifest
-2. **Clone** — shallow clones your repo to a temp directory
-3. **Plan** — compares manifest state × repo state × local disk state
+1. **Pre-flight** — loads config and sources, loads or repairs the manifest
+2. **Per-source clone** — shallow clones each source repo to an isolated temp dir
+3. **Per-source plan** — compares manifest state × repo state × local disk state for each source
 4. **Execute** — adds new skills, updates changed ones, optionally removes deleted ones
-5. **Save** — writes the manifest atomically
+5. **Save** — writes the manifest atomically once
+
+### Display
+
+Skills are always shown with their source alias: `skill-name (source-alias)`. This makes it clear where each skill comes from, especially when the same skill name exists in multiple sources.
 
 ### Robustness
 
 | Scenario | Behavior |
 |----------|----------|
-| Manifest lost | Rebuilds by scanning the skills directory against the repo |
+| Manifest lost | Rebuilds by scanning the skills directory against sources |
 | Manifest corrupt | Backs up to `.json.bak` and rebuilds |
-| Skill edited locally | Warns but preserves your changes if repo hasn't changed |
-| Skill edited locally + repo updated | Warns and overwrites with repo version |
-| Skill folder deleted manually | Reinstalls from repo |
+| Skill edited locally | Warns but preserves your changes if source hasn't changed |
+| Skill edited locally + source updated | Warns and overwrites with source version |
+| Skill folder deleted manually | Reinstalls from source |
+| One source unreachable | Other sources still sync (per-source error isolation) |
 | Non-managed skills | Never read, compared, or modified |
 
 ---
