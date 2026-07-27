@@ -57,49 +57,7 @@ func createLocalRepo(t *testing.T, dir, branch string, skills []string) {
 	}
 }
 
-func TestInitCmd_ValidURL(t *testing.T) {
-	// Create a local source repo.
-	repoDir := t.TempDir()
-	createLocalRepo(t, repoDir, "main", []string{"skill-a", "skill-b"})
-
-	// Redirect home so ~/.config/slap lands in our temp area.
-	homeDir := t.TempDir()
-	t.Setenv("HOME", homeDir)
-
-	root := NewRootCmd()
-	repoURL := "file://" + repoDir
-	root.SetArgs([]string{"init", repoURL})
-	err := root.Execute()
-	if err != nil {
-		t.Fatalf("init with valid URL failed: %v", err)
-	}
-
-	// Verify the source file was created.
-	src, err := config.ReadSource("default")
-	if err != nil {
-		t.Fatalf("reading source 'default' after init: %v", err)
-	}
-	if src.URL != repoURL {
-		t.Errorf("Source URL = %q, want %q", src.URL, repoURL)
-	}
-	if src.Branch != "main" {
-		t.Errorf("Source Branch = %q, want %q", src.Branch, "main")
-	}
-}
-
-func TestInitCmd_InvalidURL(t *testing.T) {
-	homeDir := t.TempDir()
-	t.Setenv("HOME", homeDir)
-
-	root := NewRootCmd()
-	root.SetArgs([]string{"init", "file:///nonexistent-repo-that-does-not-exist"})
-	err := root.Execute()
-	if err == nil {
-		t.Fatal("init with invalid URL should have failed, got nil")
-	}
-}
-
-func TestInitCmd_NoArgsWithSources(t *testing.T) {
+func TestInitCmd_AlreadyConfigured(t *testing.T) {
 	homeDir := t.TempDir()
 	t.Setenv("HOME", homeDir)
 
@@ -121,51 +79,24 @@ func TestInitCmd_NoArgsWithSources(t *testing.T) {
 		t.Fatalf("saving config: %v", err)
 	}
 
-	// init with no args should say already configured (not error).
+	// init should say already configured (not error).
 	root := NewRootCmd()
 	root.SetArgs([]string{"init"})
 	if err := root.Execute(); err != nil {
-		t.Fatalf("init with no args should work when sources exist, got: %v", err)
+		t.Fatalf("init should not error when sources exist, got: %v", err)
 	}
 }
 
-func TestInitCmd_NoArgsNoSources(t *testing.T) {
+func TestInitCmd_NoSourcesLaunchesWizard(t *testing.T) {
 	homeDir := t.TempDir()
 	t.Setenv("HOME", homeDir)
 
-	// Run migration so sources dir exists but is empty.
-	_ = config.MigrateConfig()
-
-	// init with no args and no sources — should launch wizard (interactive will
-	// fail since no PTY, but should not say "accepts 1 arg(s), received 0").
+	// No sources — init should try to launch the interactive wizard.
 	root := NewRootCmd()
 	root.SetArgs([]string{"init"})
 	err := root.Execute()
-	// Expected: either EOF/terminal error from survey (no PTY) or success with
-	// "No sources configured" message. Anything other than "accepts N arg(s)" is fine.
+	// Expected: either EOF/terminal error from survey (no PTY) or success.
 	if err != nil {
-		t.Logf("init with no args and no sources gave expected interactive error: %v", err)
-	}
-}
-
-func TestInitCmd_SavesBranchFromFlag(t *testing.T) {
-	repoDir := t.TempDir()
-	createLocalRepo(t, repoDir, "develop", []string{"skill-a"})
-
-	homeDir := t.TempDir()
-	t.Setenv("HOME", homeDir)
-
-	root := NewRootCmd()
-	root.SetArgs([]string{"init", "--branch", "develop", "file://" + repoDir})
-	if err := root.Execute(); err != nil {
-		t.Fatalf("init with --branch failed: %v", err)
-	}
-
-	src, err := config.ReadSource("default")
-	if err != nil {
-		t.Fatalf("reading source 'default': %v", err)
-	}
-	if src.Branch != "develop" {
-		t.Errorf("Source Branch = %q, want %q", src.Branch, "develop")
+		t.Logf("init with no sources gave expected interactive error: %v", err)
 	}
 }
