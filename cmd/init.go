@@ -7,42 +7,33 @@ import (
 	"github.com/vekzz-dev/slap-skills/internal/config"
 )
 
-// newInitCmd creates the `slap init <repo-url>` command.
+// newInitCmd creates the `slap init` command.
 func newInitCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "init <repo-url>",
-		Short: "Configure a git repo as the skill source",
-		Long: `Configure a git repo as the source for AI agent skills.
+		Use:   "init",
+		Short: "Set up slap with your first skill source",
+		Long: `Run the initial setup wizard to add your first skill source.
 
-Validates that the repo is reachable (ls-remote), then writes the
-configuration to ~/.config/slap/config.yaml so that 'slap sync'
-knows where to pull skills from.`,
-		Args: cobra.ExactArgs(1),
+If sources are already configured, shows a message directing you
+to 'slap source add' for additional sources.`,
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			repoURL := args[0]
-
-			// Read flags that were passed by the user (falls back to persistent
-			// flag defaults when not explicitly provided).
-			branch, _ := cmd.Flags().GetString("branch")
-			targetDir, _ := cmd.Flags().GetString("target-dir")
-
-			// Validate the repo is reachable.
-			if err := config.ValidateRepoAccess(repoURL, branch); err != nil {
-				return fmt.Errorf("repo validation failed: %w", err)
+			// Run migration first — handles old-style config upgrade.
+			if err := config.MigrateConfig(); err != nil {
+				return fmt.Errorf("config migration: %w", err)
 			}
 
-			// Build config and persist it.
-			cfg := &config.Config{
-				RepoURL:   repoURL,
-				Branch:    branch,
-				TargetDir: targetDir,
-			}
-			if err := cfg.Save(config.ConfigFile); err != nil {
-				return fmt.Errorf("saving config: %w", err)
+			aliases, err := config.ListSources()
+			if err == nil && len(aliases) > 0 {
+				fmt.Println("Slap is already configured. Use 'slap source add' to add more sources.")
+				return nil
 			}
 
-			fmt.Println("Slap configured! Run 'slap sync' to install your skills.")
-			return nil
+			// No sources — launch interactive add.
+			fmt.Println("No sources configured. Starting the setup wizard...")
+			sourceRoot := NewRootCmd()
+			sourceRoot.SetArgs([]string{"source", "add"})
+			return sourceRoot.Execute()
 		},
 	}
 

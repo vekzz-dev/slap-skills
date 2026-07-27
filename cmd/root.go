@@ -93,12 +93,13 @@ func NewRootCmd() *cobra.Command {
 		Short:   "Slap Skills — manage AI agent skills from a git repo",
 		Long: `Slap Skills syncs AI agent skills from any git repo to your local skills directory.
 
-  init    - Configure a git repo as the skill source
-  install - Select and install skills from the repo
+  init    - Add a git repo as a skill source (alias of 'source add')
+  source  - Manage skill source repos (add, list, remove)
+  install - Select and install skills from sources
   remove  - Remove installed skills
-  sync    - Update installed skills from the repo
+  sync    - Update installed skills from all sources
   list    - List installed skills
-  status  - Show drift between local skills and the repo
+  status  - Show drift between local skills and sources
   version - Print the current version`,
 	}
 
